@@ -3270,7 +3270,8 @@ onAuthStateChanged(auth, async user=>{
 
   hideLoading();
   render();
-
+  if(isAdmin()) setTimeout(cargarNotifContenidos, 2000);
+});
 
 async function cargarNotifContenidos(){
   try{
