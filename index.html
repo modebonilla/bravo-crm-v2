@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bravo CRM Lite v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#e8ff47;--primary-dark:#c8dc20;
+  --bg:#0d0d0d;--surface:#161616;--surface-el:#1e1e1e;--border:#2a2a2a;
+  --text:#f5f5f5;--text-sec:#a0a0a0;--text-muted:#606060;
+  --success:#22c55e;--warning:#f59e0b;--error:#ef4444;--info:#3b82f6;
+  --font-head:"Syne",sans-serif;--font-body:"DM Sans",sans-serif;--font-mono:"JetBrains Mono",monospace;
+  --r:8px;--r-lg:16px;--sidebar:240px;--topbar:60px;--tr:150ms ease;
+}
+html,body,#app{height:100%;min-height:100%}
+body{font-family:var(--font-body);font-size:14px;line-height:1.6;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,h5,h6{font-family:var(--font-head);font-weight:700;line-height:1.2}
+a{color:var(--primary);text-decoration:none}
+button,input,select,textarea{font-family:var(--font-body)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
+
+/* LAYOUT */
+.app-shell{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:fixed;left:0;top:0;z-index:200;transition:transform .3s ease;overflow-y:auto}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:#000a;z-index:199;cursor:pointer}
+.main-content{flex:1;display:flex;flex-direction:column;margin-left:var(--sidebar);overflow:hidden}
+.topbar{height:var(--topbar);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0}
+.page-content{flex:1;overflow-y:auto;padding:24px}
+
+/* SIDEBAR */
+.sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid var(--border)}
+.logo-text{font-family:var(--font-head);font-size:18px;font-weight:800;color:var(--primary);letter-spacing:-.5px}
+.logo-sub{font-size:10px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-top:2px}
+.sidebar-nav{flex:1;padding:12px 8px;overflow-y:auto}
+.nav-label{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);padding:8px 12px 4px;margin-top:8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r);color:var(--text-sec);cursor:pointer;font-size:13px;font-weight:500;transition:all var(--tr);border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--surface-el);color:var(--text)}
+.nav-item.active{background:var(--primary);color:#000}
+.nav-item svg{flex-shrink:0;width:16px;height:16px}
+.sidebar-footer{padding:12px 8px;border-top:1px solid var(--border)}
+.hamburger{display:none;background:none;border:none;color:var(--text);cursor:pointer;padding:6px;align-items:center}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;position:relative;overflow:hidden}
+.metric-card::before{content:"";position:absolute;left:0;top:0;height:100%;width:3px;background:var(--primary);border-radius:2px 0 0 2px}
+.metric-label{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px}
+.metric-value{font-family:var(--font-head);font-size:28px;font-weight:800;color:var(--text);line-height:1}
+.metric-value.hi{color:var(--primary)}
+.metric-sub{font-size:12px;color:var(--text-muted);margin-top:6px}
+
+/* PROGRESS BAR */
+.progress-wrap{background:var(--border);border-radius:4px;height:4px;overflow:hidden;margin-top:8px}
+.progress-bar{height:100%;border-radius:4px;background:var(--primary);transition:width .5s ease}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--r);border:none;cursor:pointer;font-family:var(--font-body);font-size:14px;font-weight:600;transition:all var(--tr);white-space:nowrap;text-decoration:none}
+.btn-primary{background:var(--primary);color:#000}
+.btn-primary:hover{background:var(--primary-dark);transform:translateY(-1px)}
+.btn-secondary{background:var(--surface-el);border:1px solid var(--border);color:var(--text)}
+.btn-secondary:hover{background:var(--border)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text-sec)}
+.btn-ghost:hover{background:var(--surface-el);color:var(--text)}
+.btn-danger{background:var(--error);color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-sm{font-size:12px;padding:6px 12px}
+.btn-lg{font-size:15px;padding:13px 24px;width:100%;justify-content:center}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+.btn-icon{padding:7px;background:var(--surface-el);border:1px solid var(--border);border-radius:var(--r);color:var(--text-sec);cursor:pointer;transition:all var(--tr);display:inline-flex;align-items:center;justify-content:center}
+.btn-icon:hover{color:var(--text);border-color:var(--text-muted)}
+
+/* FORMS */
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-label{font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text-sec)}
+.form-label .req{color:var(--error);margin-left:3px}
+.form-input,.form-select,.form-textarea{background:var(--surface-el);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font-body);font-size:14px;outline:none;padding:10px 14px;transition:border-color var(--tr);width:100%;-webkit-appearance:none}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px #e8ff4720}
+.form-select{cursor:pointer}
+.form-textarea{min-height:90px;resize:vertical}
+.form-error{color:var(--error);font-size:12px}
+.form-hint{color:var(--text-muted);font-size:12px}
+.form-row{display:grid;gap:16px;grid-template-columns:1fr 1fr}
+
+/* TABLE */
+.table-wrap{border:1px solid var(--border);border-radius:var(--r-lg);overflow-x:auto}
+table{width:100%;border-collapse:collapse;background:var(--surface)}
+thead{background:var(--surface-el)}
+th{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);text-align:left;padding:10px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid var(--border);color:var(--text-sec);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface-el);color:var(--text)}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;letter-spacing:.5px}
+.badge-fb{background:#1877f226;color:#4b9ef5}
+.badge-ig{background:#e1306c26;color:#f06292}
+.badge-wa{background:#25d36626;color:#25d366}
+.badge-success{background:#22c55e26;color:var(--success)}
+.badge-error{background:#ef444426;color:var(--error)}
+.badge-warning{background:#f59e0b26;color:var(--warning)}
+.badge-primary{background:#e8ff4726;color:var(--primary)}
+.badge-muted{background:#a0a0a026;color:var(--text-sec)}
+.badge-info{background:#3b82f626;color:var(--info)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:#000c;backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);max-width:540px;width:100%;max-height:90vh;overflow-y:auto}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid var(--border)}
+.modal-title{font-family:var(--font-head);font-size:17px;font-weight:700}
+.modal-body{padding:24px;display:flex;flex-direction:column;gap:16px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end}
+
+/* TOAST */
+#toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px}
+.toast{display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--surface-el);border:1px solid var(--border);border-radius:var(--r);box-shadow:0 8px 32px #0008;font-size:14px;font-weight:500;max-width:360px;animation:slideIn .2s ease}
+.toast-success{border-left:3px solid var(--success);color:var(--success)}
+.toast-error{border-left:3px solid var(--error);color:var(--error)}
+.toast-info{border-left:3px solid var(--info);color:var(--info)}
+@keyframes slideIn{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
+
+/* PAGE HEADER */
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px}
+.page-title{font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--text)}
+.page-subtitle{font-size:12px;color:var(--text-muted);margin-top:3px}
+
+/* GRIDS */
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+
+/* LOGIN */
+.login-page{min-height:100vh;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden}
+.login-page::before{content:"";position:absolute;width:600px;height:600px;background:radial-gradient(circle,#e8ff4710 0%,transparent 70%);top:-20%;right:-15%;border-radius:50%;pointer-events:none}
+.login-page::after{content:"";position:absolute;width:400px;height:400px;background:radial-gradient(circle,#e8ff4708 0%,transparent 70%);bottom:-10%;left:-10%;border-radius:50%;pointer-events:none}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:40px;width:100%;max-width:420px;position:relative;z-index:1}
+.login-brand{margin-bottom:32px;text-align:center}
+.login-brand .logo{font-family:var(--font-head);font-size:24px;font-weight:800;color:var(--primary)}
+.login-brand .tagline{font-size:12px;color:var(--text-muted);margin-top:4px;letter-spacing:1px;text-transform:uppercase}
+.login-title{font-family:var(--font-head);font-size:20px;font-weight:700;margin-bottom:6px}
+.login-sub{font-size:13px;color:var(--text-muted);margin-bottom:24px}
+.login-switch{text-align:center;margin-top:20px;font-size:13px;color:var(--text-muted)}
+.login-switch a{color:var(--primary);cursor:pointer}
+
+/* ROAS */
+.roas-display{background:var(--surface-el);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;text-align:center}
+.roas-number{font-family:var(--font-head);font-size:56px;font-weight:800;color:var(--primary);line-height:1}
+.roas-label{font-size:13px;color:var(--text-muted);margin-top:8px;letter-spacing:1px;text-transform:uppercase}
+
+/* STAT ROW */
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}
+.stat-row:last-child{border-bottom:none}
+.stat-key{font-size:13px;color:var(--text-muted)}
+.stat-val{font-size:13px;font-weight:600;color:var(--text)}
+
+/* SECTION TITLE */
+.section-title{font-family:var(--font-head);font-size:14px;font-weight:700;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+
+/* AVATAR */
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;flex-shrink:0}
+.avatar-lg{width:44px;height:44px;font-size:16px}
+
+/* TABS */
+.tabs{display:flex;gap:4px;background:var(--surface-el);border-radius:var(--r);padding:4px;width:fit-content;margin-bottom:20px}
+.tab{padding:7px 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text-muted);cursor:pointer;transition:all var(--tr);border:none;background:none}
+.tab.active{background:var(--primary);color:#000;font-weight:700}
+
+/* CHIP */
+.chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;background:var(--surface-el);border:1px solid var(--border);font-size:12px;font-weight:500}
+
+/* RANKING */
+.ranking-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.ranking-item:last-child{border-bottom:none}
+.ranking-num{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);width:20px;flex-shrink:0}
+.ranking-bar-wrap{flex:1;background:var(--border);border-radius:4px;height:6px;overflow:hidden}
+.ranking-bar{height:100%;background:var(--primary);border-radius:4px}
+
+/* EMPTY & LOADING */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center;color:var(--text-muted)}
+.empty-state svg{opacity:.3;margin-bottom:16px;width:40px;height:40px}
+.empty-state h3{font-size:15px;color:var(--text-sec);margin-bottom:6px}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px}
+.section-loading{display:flex;align-items:center;justify-content:center;padding:60px;gap:12px;color:var(--text-muted)}
+
+/* FILTERS */
+.filters-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:20px}
+.filters-bar .form-group{flex:1;min-width:140px;max-width:220px}
+
+/* COLOR PICKER */
+.color-swatch{width:32px;height:32px;border-radius:6px;border:2px solid var(--border);cursor:pointer;transition:border-color var(--tr)}
+.color-swatch.selected{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary)40}
+
+/* UTILITIES */
+.flex{display:flex}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-between{justify-content:space-between}.justify-end{justify-content:flex-end}
+.gap-1{gap:4px}.gap-2{gap:8px}.gap-3{gap:12px}.gap-4{gap:16px}
+.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mt-4{margin-top:16px}.mb-2{margin-bottom:8px}.mb-4{margin-bottom:16px}
+.text-primary{color:var(--primary)}.text-muted{color:var(--text-muted)}.text-sec{color:var(--text-sec)}.text-success{color:var(--success)}.text-error{color:var(--error)}.text-warning{color:var(--warning)}
+.font-mono{font-family:var(--font-mono)}.font-head{font-family:var(--font-head)}.font-bold{font-weight:700}.font-800{font-weight:800}
+.w-full{width:100%}.text-sm{font-size:12px}.text-lg{font-size:16px}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hidden{display:none!important}.divider{height:1px;background:var(--border);margin:16px 0}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay.open{display:block}
+  .main-content{margin-left:0}
+  .hamburger{display:flex}
+  .page-content{padding:16px}
+  .metrics-grid{grid-template-columns:repeat(2,1fr)}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .login-card{padding:28px 20px}
+  .modal{max-width:100%}
+  .page-header{flex-direction:column}
+  .roas-number{font-size:40px}
+  .filters-bar .form-group{flex:1 1 calc(50% - 6px);max-width:100%}
+}
+@media(max-width:480px){
+  .metrics-grid{grid-template-columns:1fr}
+  .filters-bar .form-group{flex:1 1 100%}
+}
+@media(min-width:769px){
+  .main-content{margin-left:var(--sidebar)}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="loading-screen" id="loading-screen">
+    <div class="spinner"></div>
+    <p style="color:var(--text-muted);font-size:13px;margin-top:8px">Iniciando Bravo CRM…</p>
+  </div>
+</div>
+<div id="toast-container"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut,
+  sendPasswordResetEmail, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import {
+  getFirestore, collection, doc, getDocs, getDoc,
+  addDoc, updateDoc, deleteDoc, setDoc, query, where,
+  orderBy, serverTimestamp, Timestamp
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+// ─────────────────────────────────────────
+// 🔥 PEGA AQUÍ TU FIREBASE CONFIG
+// ─────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDv_N9KnRJMPB7VSXz7b3eJQ7ZNcKxFH6I",
+  authDomain: "bravo-crm-lite.firebaseapp.com",
+  projectId: "bravo-crm-lite",
+  storageBucket: "bravo-crm-lite.firebasestorage.app",
+  messagingSenderId: "555637970627",
+  appId: "1:555637970627:web:cdd9be3ec2c80132de7476",
+  measurementId: "G-PEGZ0MNPKT"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const auth  = getAuth(fbApp);
+const db    = getFirestore(fbApp);
+
+// ─────────────────────────────────────────
+// ESTADO GLOBAL
+// ─────────────────────────────────────────
+let S = {
+  user: null,
+  profile: null,
+  workspaces: [],
+  currentWorkspace: null,
+  section: "panel-agencia",
+  sidebarOpen: false,
+};
+
+// ─────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────
+const fmtMXN = n => new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(n||0);
+const fmtDate = ts => {
+  if(!ts) return "—";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString("es-MX",{day:"2-digit",month:"short",year:"numeric"});
+};
+const initials = (s="") => s.split(" ").slice(0,2).map(w=>w[0]||"").join("").toUpperCase()||"?";
+const isAdmin  = () => S.profile?.role === "admin";
+const getWsId  = () => isAdmin() ? S.currentWorkspace?.id||null : S.profile?.workspaceId||null;
+
+function toast(msg, type="success"){
+  const el = document.createElement("div");
+  el.className = `toast toast-${type}`;
+  el.innerHTML = `<span>${type==="success"?"✓":type==="error"?"✕":"ℹ"}</span><span>${msg}</span>`;
+  document.getElementById("toast-container").appendChild(el);
+  setTimeout(()=>el.remove(), 4000);
+}
+const showLoading = () => document.getElementById("loading-screen").style.display = "flex";
+const hideLoading = () => document.getElementById("loading-screen").style.display = "none";
+
+function canalBadge(c=""){
+  const map = {facebook:"badge-fb",instagram:"badge-ig",whatsapp:"badge-wa",referido:"badge-muted",otro:"badge-muted"};
+  const cls = map[c.toLowerCase()]||"badge-muted";
+  return `<span class="badge ${cls}">${c.charAt(0).toUpperCase()+c.slice(1)||"—"}</span>`;
+}
+function rolBadge(r){
+  return r==="admin"
+    ? `<span class="badge badge-primary">Admin</span>`
+    : `<span class="badge badge-muted">Cliente</span>`;
+}
+function statusBadge(s){
+  const map={pendiente:"badge-warning",aprobado:"badge-success",rechazado:"badge-error",publicado:"badge-info",revision:"badge-muted"};
+  return `<span class="badge ${map[s]||"badge-muted"}">${s||"—"}</span>`;
+}
+
+// ─────────────────────────────────────────
+// ICONS
+// ─────────────────────────────────────────
+const ICONS = {
+  grid:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
+  "bar-chart":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>`,
+  "plus-circle":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`,
+  dollar:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
+  calendar:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  briefcase:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>`,
+  users:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>`,
+  list:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
+  settings:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>`,
+  plus:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  check:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
+  x:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  trash:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>`,
+  edit:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  download:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  copy:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>`,
+  "log-out":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+  menu:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`,
+  "trending-up":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
+  eye:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
+};
+const ico = n => `<span style="width:16px;height:16px;display:inline-flex;flex-shrink:0">${ICONS[n]||ICONS["grid"]}</span>`;
+
+// ─────────────────────────────────────────
+// RENDER RAÍZ
+// ─────────────────────────────────────────
+function render(){
+  const app = document.getElementById("app");
+  if(!S.user){ app.innerHTML = renderLogin(); bindLogin(); return; }
+  app.innerHTML = renderShell();
+  bindShell();
+  renderSection(S.section);
+}
+
+// ─────────────────────────────────────────
+// LOGIN
+// ─────────────────────────────────────────
+function renderLogin(){
+  return `<div class="login-page"><div class="login-card" id="login-card">
+    <div class="login-brand"><div class="logo">BRAVO CRM</div><div class="tagline">Resultados que se ven</div></div>
+    <div id="auth-panel">${loginForm()}</div>
+  </div></div>`;
+}
+function loginForm(){
+  return `<div class="login-title">Bienvenido</div>
+  <div class="login-sub">Ingresa con tu cuenta</div>
+  <div class="flex flex-col gap-4">
+    <div class="form-group"><label class="form-label">Correo</label><input class="form-input" id="l-email" type="email" placeholder="hola@bravo.mx" /></div>
+    <div class="form-group"><label class="form-label">Contraseña</label><input class="form-input" id="l-pass" type="password" placeholder="••••••••" /></div>
+    <button class="btn btn-primary btn-lg" id="btn-login">Entrar</button>
+  </div>
+  <div class="login-switch"><a id="btn-forgot">¿Olvidaste tu contraseña?</a></div>`;
+}
+function forgotForm(){
+  return `<div class="login-title">Recuperar acceso</div>
+  <div class="login-sub">Te enviamos un link a tu correo</div>
+  <div class="flex flex-col gap-4">
+    <div class="form-group"><label class="form-label">Correo</label><input class="form-input" id="r-email" type="email" placeholder="hola@bravo.mx" /></div>
+    <button class="btn btn-primary btn-lg" id="btn-reset">Enviar link</button>
+  </div>
+  <div class="login-switch"><a id="btn-back">← Regresar</a></div>`;
+}
+function bindLogin(){
+  document.getElementById("btn-forgot")?.addEventListener("click",()=>{
+    document.getElementById("auth-panel").innerHTML = forgotForm();
+    document.getElementById("btn-reset").addEventListener("click", doReset);
+    document.getElementById("btn-back").addEventListener("click",()=>{
+      document.getElementById("auth-panel").innerHTML = loginForm();
+      bindLoginActions();
+    });
+  });
+  bindLoginActions();
+}
+function bindLoginActions(){
+  document.getElementById("btn-login")?.addEventListener("click", doLogin);
+  document.getElementById("l-pass")?.addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+}
+async function doLogin(){
+  const email = document.getElementById("l-email").value.trim();
+  const pass  = document.getElementById("l-pass").value;
+  const btn   = document.getElementById("btn-login");
+  if(!email||!pass){ toast("Completa todos los campos","error"); return; }
+  btn.disabled=true; btn.textContent="Ingresando…";
+  try{ await signInWithEmailAndPassword(auth, email, pass); }
+  catch(e){ toast("Credenciales incorrectas","error"); btn.disabled=false; btn.textContent="Entrar"; }
+}
+async function doReset(){
+  const email = document.getElementById("r-email").value.trim();
+  if(!email){ toast("Ingresa tu correo","error"); return; }
+  try{ await sendPasswordResetEmail(auth, email); toast("Link enviado, revisa tu correo","success"); }
+  catch(e){ toast("Error al enviar el correo","error"); }
+}
+
+// ─────────────────────────────────────────
+// SHELL
+// ─────────────────────────────────────────
+function renderShell(){
+  const p = S.profile;
+  const sec = S.section;
+
+  const navAdmin = isAdmin() ? `
+    <div class="nav-label">Agencia</div>
+    <button class="nav-item ${sec==="panel-agencia"?"active":""}" data-section="panel-agencia">${ico("grid")} Panel de Agencia</button>
+    <button class="nav-item ${sec==="contenidos"?"active":""}" data-section="contenidos">${ico("calendar")} Contenidos</button>
+    <div class="nav-label">Administración</div>
+    <button class="nav-item ${sec==="workspaces"?"active":""}" data-section="workspaces">${ico("briefcase")} Workspaces</button>
+    <button class="nav-item ${sec==="usuarios"?"active":""}" data-section="usuarios">${ico("users")} Usuarios</button>
+    <button class="nav-item ${sec==="todas-ventas"?"active":""}" data-section="todas-ventas">${ico("list")} Todas las Ventas</button>
+    <button class="nav-item ${sec==="configuracion"?"active":""}" data-section="configuracion">${ico("settings")} Configuración</button>
+  ` : `
+    <div class="nav-label">Mi Workspace</div>
+    <button class="nav-item ${sec==="dashboard"?"active":""}" data-section="dashboard">${ico("grid")} Dashboard</button>
+    <button class="nav-item ${sec==="registrar-venta"?"active":""}" data-section="registrar-venta">${ico("plus-circle")} Registrar Venta</button>
+    <button class="nav-item ${sec==="mis-ventas"?"active":""}" data-section="mis-ventas">${ico("dollar")} Mis Ventas</button>
+    <button class="nav-item ${sec==="roas"?"active":""}" data-section="roas">${ico("bar-chart")} ROAS Calculator</button>
+    <button class="nav-item ${sec==="contenidos"?"active":""}" data-section="contenidos">${ico("calendar")} Contenidos</button>
+  `;
+
+  // Topbar derecha: si admin, mostrar selector de workspace
+  const wsSwitcher = isAdmin() && S.workspaces.length ? `
+    <select class="form-select" style="max-width:200px;font-size:13px" id="ws-switcher">
+      ${S.workspaces.map(w=>`<option value="${w.id}" ${S.currentWorkspace?.id===w.id?"selected":""}>${w.name}</option>`).join("")}
+    </select>` : "";
+
+  // Para admin: agregar acceso rápido al dashboard del workspace seleccionado
+  const wsLink = isAdmin() && S.currentWorkspace ? `
+    <button class="btn btn-ghost btn-sm" id="btn-ver-ws" title="Ver dashboard del cliente">${ico("eye")} Ver cliente</button>` : "";
+
+  return `
+  <div class="app-shell">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-text">BRAVO CRM</div>
+        <div class="logo-sub">v2 · ${p?.role||"cliente"}</div>
+      </div>
+      <nav class="sidebar-nav">${navAdmin}</nav>
+      <div class="sidebar-footer">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="avatar">${initials(p?.name||p?.email)}</div>
+          <div class="truncate" style="flex:1">
+            <div class="text-sm font-bold truncate">${p?.name||"Usuario"}</div>
+            <div class="text-sm text-muted truncate">${p?.email||""}</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm w-full" id="btn-logout">${ico("log-out")} Cerrar sesión</button>
+      </div>
+    </aside>
+    <div class="main-content">
+      <header class="topbar">
+        <button class="hamburger" id="hamburger">${ico("menu")}</button>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600" id="topbar-title">—</div>
+          ${isAdmin()&&S.currentWorkspace?`<div class="text-sm text-muted">Workspace: ${S.currentWorkspace.name}</div>`:""}
+        </div>
+        ${wsLink}
+        ${wsSwitcher}
+      </header>
+      <main class="page-content" id="section-content"></main>
+    </div>
+  </div>`;
+}
+
+function bindShell(){
+  document.getElementById("hamburger")?.addEventListener("click", toggleSidebar);
+  document.getElementById("sidebar-overlay")?.addEventListener("click", closeSidebar);
+  document.querySelectorAll("[data-section]").forEach(btn=>{
+    btn.addEventListener("click",()=>{ S.section=btn.dataset.section; closeSidebar(); updateNav(); renderSection(S.section); });
+  });
+  document.getElementById("btn-logout")?.addEventListener("click",()=>signOut(auth));
+  document.getElementById("ws-switcher")?.addEventListener("change",e=>{
+    S.currentWorkspace = S.workspaces.find(w=>w.id===e.target.value)||null;
+    renderSection(S.section);
+  });
+  document.getElementById("btn-ver-ws")?.addEventListener("click",()=>{
+    S.section="dashboard"; updateNav(); renderSection("dashboard");
+  });
+}
+
+function toggleSidebar(){
+  S.sidebarOpen=!S.sidebarOpen;
+  document.getElementById("sidebar")?.classList.toggle("open",S.sidebarOpen);
+  document.getElementById("sidebar-overlay")?.classList.toggle("open",S.sidebarOpen);
+}
+function closeSidebar(){
+  S.sidebarOpen=false;
+  document.getElementById("sidebar")?.classList.remove("open");
+  document.getElementById("sidebar-overlay")?.classList.remove("open");
+}
+function updateNav(){
+  document.querySelectorAll("[data-section]").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.section===S.section);
+  });
+}
+
+// ─────────────────────────────────────────
+// ROUTER
+// ─────────────────────────────────────────
+const TITLES = {
+  "panel-agencia":"Panel de Agencia","dashboard":"Dashboard",
+  "registrar-venta":"Registrar Venta","mis-ventas":"Mis Ventas",
+  roas:"ROAS Calculator","contenidos":"Programación de Contenidos",
+  workspaces:"Workspaces","usuarios":"Usuarios",
+  "todas-ventas":"Todas las Ventas","configuracion":"Configuración de Marca"
+};
+
+async function renderSection(sec){
+  const el = document.getElementById("section-content");
+  if(!el) return;
+  const title = document.getElementById("topbar-title");
+  if(title) title.textContent = TITLES[sec]||sec;
+  el.innerHTML = `<div class="section-loading"><div class="spinner"></div></div>`;
+  try{
+    switch(sec){
+      case "panel-agencia":    await secPanelAgencia(el); break;
+      case "dashboard":        await secDashboard(el); break;
+      case "registrar-venta":  await secRegistrarVenta(el); break;
+      case "mis-ventas":       await secMisVentas(el); break;
+      case "roas":             await secROAS(el); break;
+      case "contenidos":       await secContenidos(el); break;
+      case "workspaces":       await secWorkspaces(el); break;
+      case "usuarios":         await secUsuarios(el); break;
+      case "todas-ventas":     await secTodasVentas(el); break;
+      case "configuracion":    await secConfiguracion(el); break;
+      default: el.innerHTML=`<div class="empty-state"><h3>Sección no encontrada</h3></div>`;
+    }
+  }catch(err){
+    console.error(err);
+    el.innerHTML=`<div class="empty-state"><h3>Error cargando</h3><p style="font-size:12px;margin-top:4px">${err.message}</p></div>`;
+  }
+}
+
+// ─────────────────────────────────────────
+// PANEL DE AGENCIA (admin, vista global)
+// ─────────────────────────────────────────
+async function secPanelAgencia(el){
+  if(!isAdmin()){ el.innerHTML=`<div class="empty-state"><h3>Acceso restringido</h3></div>`; return; }
+
+  // Cargar todas las ventas de todos los workspaces
+  let todasVentas = [];
+  let wsConVentas = [];
+  for(const ws of S.workspaces){
+    const snap = await getDocs(query(collection(db,"workspaces",ws.id,"ventas"),orderBy("fecha","desc")));
+    const ventas = snap.docs.map(d=>({id:d.id,...d.data(),wsId:ws.id,wsName:ws.name}));
+    todasVentas = [...todasVentas, ...ventas];
+    wsConVentas.push({ ...ws, ventas, total: ventas.reduce((a,v)=>a+(v.monto||0),0) });
+  }
+
+  // Filtros de fecha
+  const now = new Date();
+  const mesInicio = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Métricas globales
+  const totalGlobal = todasVentas.reduce((a,v)=>a+(v.monto||0),0);
+  const totalMes    = todasVentas.filter(v=>{
+    if(!v.fecha) return false;
+    const d = v.fecha.toDate ? v.fecha.toDate() : new Date(v.fecha);
+    return d >= mesInicio;
+  }).reduce((a,v)=>a+(v.monto||0),0);
+  const totalFb = todasVentas.filter(v=>v.canal?.toLowerCase()==="facebook").reduce((a,v)=>a+(v.monto||0),0);
+  const totalIg = todasVentas.filter(v=>v.canal?.toLowerCase()==="instagram").reduce((a,v)=>a+(v.monto||0),0);
+  const totalWa = todasVentas.filter(v=>v.canal?.toLowerCase()==="whatsapp").reduce((a,v)=>a+(v.monto||0),0);
+
+  // Ranking workspaces
+  const ranking = [...wsConVentas].sort((a,b)=>b.total-a.total);
+  const maxTotal = ranking[0]?.total||1;
+
+  // Últimas 8 ventas globales
+  const recientes = [...todasVentas].sort((a,b)=>{
+    const da = a.fecha?.toDate?.()||new Date(0);
+    const db2 = b.fecha?.toDate?.()||new Date(0);
+    return db2-da;
+  }).slice(0,8);
+
+  el.innerHTML = `
+  <div class="page-header">
+    <div>
+      <div class="page-title">Panel de Agencia</div>
+      <div class="page-subtitle">Vista consolidada · ${S.workspaces.length} cliente${S.workspaces.length!==1?"s":""} activos</div>
+    </div>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">Total Facturado</div>
+      <div class="metric-value hi">${fmtMXN(totalGlobal)}</div>
+      <div class="metric-sub">${todasVentas.length} ventas totales</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Este Mes</div>
+      <div class="metric-value">${fmtMXN(totalMes)}</div>
+      <div class="metric-sub">${now.toLocaleDateString("es-MX",{month:"long",year:"numeric"})}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Clientes</div>
+      <div class="metric-value">${S.workspaces.length}</div>
+      <div class="metric-sub">workspaces activos</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Ticket Promedio</div>
+      <div class="metric-value">${fmtMXN(todasVentas.length ? totalGlobal/todasVentas.length : 0)}</div>
+      <div class="metric-sub">por venta</div>
+    </div>
+  </div>
+
+  <div class="grid-2 mb-4">
+    <div class="card">
+      <div class="section-title">Ranking de clientes</div>
+      ${ranking.length===0
+        ? `<div class="empty-state" style="padding:24px"><h3>Sin datos</h3></div>`
+        : ranking.map((w,i)=>`
+        <div class="ranking-item">
+          <span class="ranking-num">${i+1}</span>
+          <div class="avatar" style="border-radius:6px;width:28px;height:28px;font-size:11px">${initials(w.name)}</div>
+          <div style="flex:1;min-width:0">
+            <div class="flex justify-between mb-1">
+              <span class="font-bold text-sm truncate">${w.name}</span>
+              <span class="text-sm text-primary font-bold">${fmtMXN(w.total)}</span>
+            </div>
+            <div class="ranking-bar-wrap">
+              <div class="ranking-bar" style="width:${Math.round((w.total/maxTotal)*100)}%"></div>
+            </div>
+          </div>
+        </div>`).join("")}
+    </div>
+
+    <div class="card">
+      <div class="section-title">Ventas por canal</div>
+      ${[
+        {label:"Facebook",val:totalFb,cls:"badge-fb"},
+        {label:"Instagram",val:totalIg,cls:"badge-ig"},
+        {label:"WhatsApp",val:totalWa,cls:"badge-wa"},
+      ].map(c=>{
+        const pct = totalGlobal>0 ? Math.round((c.val/totalGlobal)*100):0;
+        return `<div class="stat-row">
+          <span class="stat-key"><span class="badge ${c.cls}">${c.label}</span></span>
+          <div class="flex items-center gap-2">
+            <div style="width:80px;background:var(--border);border-radius:4px;height:4px">
+              <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:4px"></div>
+            </div>
+            <span class="stat-val">${fmtMXN(c.val)}</span>
+          </div>
+        </div>`;
+      }).join("")}
+      <div class="divider"></div>
+      <div class="section-title" style="margin-top:4px">Resumen por cliente</div>
+      ${wsConVentas.map(w=>`
+      <div class="stat-row">
+        <span class="stat-key truncate" style="max-width:140px">${w.name}</span>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-muted">${w.ventas.length} ventas</span>
+          <span class="stat-val">${fmtMXN(w.total)}</span>
+        </div>
+      </div>`).join("")||`<div class="text-muted text-sm" style="padding:12px 0">Sin workspaces</div>`}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Últimas ventas — todos los clientes</div>
+    ${recientes.length===0
+      ? `<div class="empty-state" style="padding:24px"><h3>Sin ventas registradas</h3></div>`
+      : `<div class="table-wrap">
+        <table>
+          <thead><tr><th>Cliente</th><th>Canal</th><th>Producto</th><th>Monto</th><th>Vendedor</th><th>Fecha</th></tr></thead>
+          <tbody>
+            ${recientes.map(v=>`<tr>
+              <td><span class="chip">${v.wsName||"—"}</span></td>
+              <td>${canalBadge(v.canal||"")}</td>
+              <td class="truncate" style="max-width:160px">${v.producto||"—"}</td>
+              <td class="font-bold text-primary">${fmtMXN(v.monto)}</td>
+              <td class="truncate" style="max-width:140px">${v.vendedorEmail||"—"}</td>
+              <td>${fmtDate(v.fecha)}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`}
+  </div>`;
+}
+
+// ─────────────────────────────────────────
+// DASHBOARD CLIENTE (workspace individual)
+// ─────────────────────────────────────────
+async function secDashboard(el){
+  const wsId = getWsId();
+  if(!wsId){ el.innerHTML=emptyWs(); return; }
+
+  const snap = await getDocs(query(collection(db,"workspaces",wsId,"ventas"),orderBy("fecha","desc")));
+  const ventas = snap.docs.map(d=>({id:d.id,...d.data()}));
+  const ws = S.currentWorkspace || S.workspaces[0];
+
+  const total    = ventas.reduce((a,v)=>a+(v.monto||0),0);
+  const totalFb  = ventas.filter(v=>v.canal?.toLowerCase()==="facebook").reduce((a,v)=>a+(v.monto||0),0);
+  const totalIg  = ventas.filter(v=>v.canal?.toLowerCase()==="instagram").reduce((a,v)=>a+(v.monto||0),0);
+  const totalWa  = ventas.filter(v=>v.canal?.toLowerCase()==="whatsapp").reduce((a,v)=>a+(v.monto||0),0);
+  const meta     = ws?.metaMensual||0;
+  const pct      = meta>0 ? Math.min(100,Math.round((total/meta)*100)) : 0;
+  const recientes= ventas.slice(0,6);
+
+  el.innerHTML = `
+  <div class="page-header">
+    <div>
+      <div class="page-title">${ws?.name||"Dashboard"}</div>
+      <div class="page-subtitle">Resumen de ventas · ${ventas.length} registro${ventas.length!==1?"s":""}</div>
+    </div>
+    <button class="btn btn-primary" id="btn-reg">${ico("plus")} Registrar venta</button>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">Total Vendido</div>
+      <div class="metric-value hi">${fmtMXN(total)}</div>
+      <div class="metric-sub">${ventas.length} ventas</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Meta Mensual</div>
+      <div class="metric-value">${fmtMXN(meta)}</div>
+      <div class="metric-sub">
+        <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+        <span style="margin-top:4px;display:block">${pct}% completado</span>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Facebook</div>
+      <div class="metric-value">${fmtMXN(totalFb)}</div>
+      <div class="metric-sub">${ventas.filter(v=>v.canal?.toLowerCase()==="facebook").length} ventas</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Instagram</div>
+      <div class="metric-value">${fmtMXN(totalIg)}</div>
+      <div class="metric-sub">${ventas.filter(v=>v.canal?.toLowerCase()==="instagram").length} ventas</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">Últimas ventas</div>
+      ${recientes.length===0
+        ? `<div class="empty-state" style="padding:24px">${ico("dollar")}<h3>Sin ventas aún</h3></div>`
+        : `<div class="table-wrap"><table>
+          <thead><tr><th>Canal</th><th>Producto</th><th>Monto</th><th>Fecha</th></tr></thead>
+          <tbody>${recientes.map(v=>`<tr>
+            <td>${canalBadge(v.canal||"")}</td>
+            <td class="truncate" style="max-width:140px">${v.producto||"—"}</td>
+            <td class="font-bold text-primary">${fmtMXN(v.monto)}</td>
+            <td>${fmtDate(v.fecha)}</td>
+          </tr>`).join("")}</tbody>
+        </table></div>`}
+    </div>
+    <div class="card">
+      <div class="section-title">Distribución por canal</div>
+      ${[{label:"Facebook",val:totalFb},{label:"Instagram",val:totalIg},{label:"WhatsApp",val:totalWa}].map(c=>{
+        const p2 = total>0?Math.round((c.val/total)*100):0;
+        return `<div class="stat-row">
+          <span class="stat-key">${c.label}</span>
+          <div class="flex items-center gap-2">
+            <div style="width:80px;background:var(--border);border-radius:4px;height:4px">
+              <div style="background:var(--primary);height:100%;width:${p2}%;border-radius:4px"></div>
+            </div>
+            <span class="stat-val">${fmtMXN(c.val)}</span>
+          </div>
+        </div>`;
+      }).join("")}
+      <div class="divider"></div>
+      <div class="stat-row"><span class="stat-key">Ticket promedio</span><span class="stat-val">${fmtMXN(ventas.length?total/ventas.length:0)}</span></div>
+    </div>
+  </div>`;
+
+  document.getElementById("btn-reg")?.addEventListener("click",()=>{ S.section="registrar-venta"; updateNav(); renderSection("registrar-venta"); });
+}
+
+// ─────────────────────────────────────────
+// REGISTRAR VENTA
+// ─────────────────────────────────────────
+async function secRegistrarVenta(el){
+  const wsId = getWsId();
+  if(!wsId){ el.innerHTML=emptyWs(); return; }
+
+  el.innerHTML = `
+  <div class="page-header">
+    <div><div class="page-title">Registrar Venta</div>
+    <div class="page-subtitle">Workspace: ${S.currentWorkspace?.name||S.workspaces[0]?.name||""}</div></div>
+  </div>
+  <div class="card" style="max-width:600px">
+    <div class="flex flex-col gap-4">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Canal <span class="req">*</span></label>
+          <select class="form-select" id="v-canal">
+            <option value="">Selecciona canal</option>
+            <option value="facebook">Facebook</option>
+            <option value="instagram">Instagram</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="referido">Referido</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Campaña</label>
+          <input class="form-input" id="v-campana" placeholder="Nombre de campaña" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Producto / Servicio <span class="req">*</span></label>
+          <input class="form-input" id="v-producto" placeholder="ej. Consultoría mensual, Paquete promo…" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Monto (MXN) <span class="req">*</span></label>
+          <input class="form-input" id="v-monto" type="number" placeholder="0.00" min="0" step="0.01" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nombre del cliente</label>
+          <input class="form-input" id="v-cliente" placeholder="Nombre completo" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">WhatsApp</label>
+          <input class="form-input" id="v-wa" type="tel" placeholder="+52 55 0000 0000" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha de venta <span class="req">*</span></label>
+        <input class="form-input" id="v-fecha" type="date" value="${new Date().toISOString().slice(0,10)}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notas</label>
+        <textarea class="form-textarea" id="v-notas" placeholder="Descuentos aplicados, contexto de la venta…"></textarea>
+      </div>
+      <div class="flex gap-3 justify-end">
+        <button class="btn btn-ghost" id="btn-limpiar">Limpiar</button>
+        <button class="btn btn-primary" id="btn-guardar">${ico("check")} Guardar Venta</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById("btn-limpiar")?.addEventListener("click",()=>secRegistrarVenta(el));
+  document.getElementById("btn-guardar")?.addEventListener("click", async()=>{
+    const canal    = document.getElementById("v-canal").value;
+    const producto = document.getElementById("v-producto").value.trim();
+    const monto    = parseFloat(document.getElementById("v-monto").value||0);
+    const fechaStr = document.getElementById("v-fecha").value;
+    if(!canal||!producto||!monto||!fechaStr){ toast("Completa los campos requeridos","error"); return; }
+    const btn = document.getElementById("btn-guardar");
+    btn.disabled=true; btn.innerHTML=`<div class="spinner" style="width:16px;height:16px"></div> Guardando…`;
+    try{
+      await addDoc(collection(db,"workspaces",wsId,"ventas"),{
+        canal, producto, monto,
+        campana:  document.getElementById("v-campana").value||"",
+        cliente:  document.getElementById("v-cliente").value||"",
+        whatsapp: document.getElementById("v-wa").value||"",
+        notas:    document.getElementById("v-notas").value||"",
+        fecha: Timestamp.fromDate(new Date(fechaStr+"T12:00:00")),
+        vendedorId: S.user.uid,
+        vendedorEmail: S.user.email,
+        creadoEn: serverTimestamp(),
+      });
+      toast("¡Venta registrada!","success");
+      secRegistrarVenta(el);
+    }catch(e){ toast("Error al guardar","error"); btn.disabled=false; btn.innerHTML=`${ico("check")} Guardar Venta`; }
+  });
+}
+
+// ─────────────────────────────────────────
+// MIS VENTAS
+// ─────────────────────────────────────────
+async function secMisVentas(el){
+  const wsId = getWsId();
+  if(!wsId){ el.innerHTML=emptyWs(); return; }
+  const snap = await getDocs(query(
+    collection(db,"workspaces",wsId,"ventas"),
+    where("vendedorId","==",S.user.uid),
+    orderBy("fecha","desc")
+  ));
+  const ventas = snap.docs.map(d=>({id:d.id,...d.data()}));
+  const total = ventas.reduce((a,v)=>a+(v.monto||0),0);
+
+  el.innerHTML = `
+  <div class="page-header">
+    <div><div class="page-title">Mis Ventas</div>
+    <div class="page-subtitle">${ventas.length} registros · Total: <span class="text-primary">${fmtMXN(total)}</span></div></div>
+    <button class="btn btn-primary" id="btn-nueva">${ico("plus")} Nueva Venta</button>
+  </div>
+  ${ventasTable(ventas,false)}`;
+
+  document.getElementById("btn-nueva")?.addEventListener("click",()=>{ S.section="registrar-venta"; updateNav(); renderSection("registrar-venta"); });
+}
+
+// ─────────────────────────────────────────
+// TODAS LAS VENTAS (admin)
+// ─────────────────────────────────────────
+async function secTodasVentas(el){
+  if(!isAdmin()){ el.innerHTML=`<div class="empty-state"><h3>Acceso restringido</h3></div>`; return; }
+  const wsId = getWsId();
+  if(!wsId){ el.innerHTML=emptyWs(); return; }
+
+  const snap = await getDocs(query(collection(db,"workspaces",wsId,"ventas"),orderBy("fecha","desc")));
+  let ventas = snap.docs.map(d=>({id:d.id,...d.data()}));
+
+  let fCanal="", fFechaD="", fFechaH="";
+
+  function filtered(){
+    return ventas.filter(v=>{
+      if(fCanal && v.canal?.toLowerCase()!==fCanal) return false;
+      if(fFechaD){
+        const d = v.fecha?.toDate?.()||new Date(v.fecha||0);
+        if(d < new Date(fFechaD)) return false;
+      }
+      if(fFechaH){
+        const d = v.fecha?.toDate?.()||new Date(v.fecha||0);
+        if(d > new Date(fFechaH+"T23:59:59")) return false;
+      }
+      return true;
+    });
+  }
+
+  function refresh(){
+    const f = filtered();
+    const t = f.reduce((a,v)=>a+(v.monto||0),0);
+    document.getElementById("tv-count").innerHTML = `${f.length} registros · <span class="text-primary">${fmtMXN(t)}</span>`;
+    document.getElementById("tv-tbody").innerHTML = f.length===0
+      ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted)">Sin resultados</td></tr>`
+      : f.map(v=>`<tr>
+          <td>${canalBadge(v.canal||"")}</td>
+          <td>${v.campana||"—"}</td>
+          <td>${v.producto||"—"}</td>
+          <td class="font-bold text-primary">${fmtMXN(v.monto)}</td>
+          <td>${v.cliente||"—"}</td>
+          <td>${v.vendedorEmail||"—"}</td>
+          <td>${fmtDate(v.fecha)}</td>
+          <td><button class="btn-icon" onclick="window._delVenta('${wsId}','${v.id}')">${ico("trash")}</button></td>
+        </tr>`).join("");
+  }
+
+  el.innerHTML = `
+  <div class="page-header">
+    <div><div class="page-title">Todas las Ventas</div>
+    <div class="page-subtitle" id="tv-count"></div></div>
+    <button class="btn btn-secondary" id="btn-csv">${ico("download")} Exportar CSV</button>
+  </div>
+  <div class="filters-bar">
+    <div class="form-group">
+      <label class="form-label">Canal</label>
+      <select class="form-select" id="f-canal">
+        <option value="">Todos</option>
+        <option value="facebook">Facebook</option>
+        <option value="instagram">Instagram</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="referido">Referido</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Desde</label>
+      <input class="form-input" id="f-desde" type="date" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Hasta</label>
+      <input class="form-input" id="f-hasta" type="date" />
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Canal</th><th>Campaña</th><th>Producto</th><th>Monto</th><th>Cliente</th><th>Vendedor</th><th>Fecha</th><th></th></tr></thead>
+      <tbody id="tv-tbody"></tbody>
+    </table>
+  </div>`;
+
+  refresh();
+  document.getElementById("f-canal").addEventListener("change",e=>{fCanal=e.target.value;refresh();});
+  document.getElementById("f-desde").addEventListener("change",e=>{fFechaD=e.target.value;refresh();});
+  document.getElementById("f-hasta").addEventListener("change",e=>{fFechaH=e.target.value;refresh();});
+  document.getElementById("btn-csv").addEventListener("click",()=>exportCSV(filtered()));
+
+  window._delVenta = async(wid,vid)=>{
+    if(!confirm("¿Eliminar esta venta?")) return;
+    await deleteDoc(doc(db,"workspaces",wid,"ventas",vid));
+    toast("Venta eliminada","success");
+    renderSection("todas-ventas");
+  };
+}
+
+function ventasTable(ventas, showVendedor=false){
+  if(!ventas.length) return `<div class="empty-state">${ico("dollar")}<h3>Sin ventas registradas</h3><p>Registra tu primera venta para verla aquí.</p></div>`;
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Canal</th><th>Producto</th><th>Monto</th>${showVendedor?"<th>Vendedor</th>":""}<th>Cliente</th><th>Fecha</th></tr></thead>
+    <tbody>${ventas.map(v=>`<tr>
+      <td>${canalBadge(v.canal||"")}</td>
+      <td class="truncate" style="max-width:180px">${v.producto||"—"}</td>
+      <td class="font-bold text-primary">${fmtMXN(v.monto)}</td>
+      ${showVendedor?`<td>${v.vendedorEmail||"—"}</td>`:""}
+      <td>${v.cliente||"—"}</td>
+      <td>${fmtDate(v.fecha)}</td>
+    </tr>`).join("")}</tbody>
+  </table></div>`;
+}
+
+function exportCSV(ventas){
+  const cols=["canal","campana","producto","monto","cliente","vendedorEmail","whatsapp","fecha"];
+  const hdr=["Canal","Campaña","Producto","Monto","Cliente","Vendedor","WhatsApp","Fecha"].join(",");
+  const rows=ventas.map(v=>cols.map(c=>{
+    if(c==="fecha") return fmtDate(v.fecha);
+    return `"${(v[c]||"").toString().replace(/"/g,'""')}"`;
+  }).join(","));
+  const a=document.createElement("a");
+  a.href="data:text/csv;charset=utf-8,"+encodeURIComponent([hdr,...rows].join("\n"));
+  a.download=`ventas-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ─────────────────────────────────────────
+// ROAS CALCULATOR
+// ─────────────────────────────────────────
+async function secROAS(el){
+  el.innerHTML = `
+  <div class="page-header">
+    <div><div class="page-title">ROAS Calculator</div>
+    <div class="page-subtitle">Calcula y comparte los resultados con tu cliente</div></div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">Datos de campaña</div>
+      <div class="flex flex-col gap-4">
+        <div class="form-group"><label class="form-label">Cliente / Campaña</label><input class="form-input" id="r-nombre" placeholder="ej. Dr. Maravert · Julio 2025" /></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Inversión en Ads (MXN) <span class="req">*</span></label><input class="form-input" id="r-inv" type="number" placeholder="0" /></div>
+          <div class="form-group"><label class="form-label">Ingresos Generados (MXN) <span class="req">*</span></label><input class="form-input" id="r-ing" type="number" placeholder="0" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Leads Generados</label><input class="form-input" id="r-leads" type="number" placeholder="0" /></div>
+          <div class="form-group"><label class="form-label">Ventas Cerradas</label><input class="form-input" id="r-ventas" type="number" placeholder="0" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Alcance</label><input class="form-input" id="r-alcance" type="number" placeholder="0" /></div>
+          <div class="form-group"><label class="form-label">Clics</label><input class="form-input" id="r-clics" type="number" placeholder="0" /></div>
+        </div>
+        <button class="btn btn-primary" id="btn-calc">${ico("bar-chart")} Calcular ROAS</button>
+      </div>
+    </div>
+    <div class="card" id="roas-result">
+      <div class="empty-state">${ico("bar-chart")}<h3>Ingresa los datos y presiona calcular</h3></div>
+    </div>
+  </div>`;
+
+  document.getElementById("btn-calc").addEventListener("click",()=>{
+    const inv   = parseFloat(document.getElementById("r-inv").value||0);
+    const ing   = parseFloat(document.getElementById("r-ing").value||0);
+    const leads = parseInt(document.getElementById("r-leads").value||0);
+    const vts   = parseInt(document.getElementById("r-ventas").value||0);
+    const alc   = parseInt(document.getElementById("r-alcance").value||0);
+    const clics = parseInt(document.getElementById("r-clics").value||0);
+    const nombre= document.getElementById("r-nombre").value||"Campaña";
+    if(!inv||!ing){ toast("Ingresa inversión e ingresos","error"); return; }
+
+    const roas = (ing/inv).toFixed(2);
+    const roi  = (((ing-inv)/inv)*100).toFixed(1);
+    const cpl  = leads>0 ? (inv/leads).toFixed(2) : null;
+    const cvr  = leads>0 ? ((vts/leads)*100).toFixed(1) : null;
+    const ctr  = alc>0   ? ((clics/alc)*100).toFixed(2) : null;
+    const color= roas>=3 ? "var(--success)" : roas>=1 ? "var(--warning)" : "var(--error)";
+
+    document.getElementById("roas-result").innerHTML = `
+    <div class="section-title">${nombre}</div>
+    <div class="roas-display mb-4" style="border-color:${color}">
+      <div class="roas-number" style="color:${color}">${roas}x</div>
+      <div class="roas-label">ROAS · Retorno en Ads</div>
+    </div>
+    <div class="stat-row"><span class="stat-key">Inversión</span><span class="stat-val">${fmtMXN(inv)}</span></div>
+    <div class="stat-row"><span class="stat-key">Ingresos</span><span class="stat-val text-success">${fmtMXN(ing)}</span></div>
+    <div class="stat-row"><span class="stat-key">ROI</span><span class="stat-val" style="color:${color}">${roi}%</span></div>
+    ${cpl?`<div class="stat-row"><span class="stat-key">Costo por Lead</span><span class="stat-val">${fmtMXN(cpl)}</span></div>`:""}
+    ${cvr?`<div class="stat-row"><span class="stat-key">Tasa de Conversión</span><span class="stat-val">${cvr}%</span></div>`:""}
+    ${ctr?`<div class="stat-row"><span class="stat-key">CTR</span><span class="stat-val">${ctr}%</span></div>`:""}
+    ${alc?`<div class="stat-row"><span class="stat-key">Alcance</span><span class="stat-val">${alc.toLocaleString("es-MX")}</span></div>`:""}
+    <div class="divider"></div>
+    <button class="btn btn-secondary w-full" id="btn-copiar">${ico("copy")} Copiar reporte para cliente</button>`;
+
+    document.getElementById("btn-copiar")?.addEventListener("click",()=>{
+      const txt=`📊 REPORTE BRAVO · ${nombre}\n\n🎯 ROAS: ${roas}x\n💰 Inversión: ${fmtMXN(inv)}\n✅ Ingresos generados: ${fmtMXN(ing)}\n📈 ROI: ${roi}%${cpl?`\n🎣 Costo por Lead: ${fmtMXN(cpl)}`:""}${cvr?`\n🔄 Tasa de conversión: ${cvr}%`:""}${ctr?`\n👆 CTR: ${ctr}%`:""}\n\n— Bravo Agency`;
+      navigator.clipboard.writeText(txt).then(()=>toast("Reporte copiado","success"));
+    });
+  });
+}
+
+// ─────────────────────────────────────────
+// CONTENIDOS
+// ─────────────────────────────────────────
+async function secContenidos(el){
+  const wsId = getWsId();
+  if(!wsId){ el.innerHTML=emptyWs(); return; }
+  const now = new Date();
+  const mes = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const snap = await getDocs(query(collection(db,"workspaces",wsId,"contenidos"),where("mes","==",mes)));
+  const piezas = snap.docs.map(d=>({id:d.id,...d.data()}));
+  const semanas = {1:[],2:[],3:[],4:[]};
+  piezas.forEach(p=>{ if(semanas[p.semana]) semanas[p.semana].push(p); });
+
+  el.innerHTML = `
+  <div class="page-header">
+    <div><div class="page-title">Programación de Contenidos</div>
+    <div class="page-subtitle">${new Date(now.getFullYear(),now.getMonth(),1).toLocaleDateString("es-MX",{month:"long",year:"numeric"})}</div></div>
+    ${isAdmin()?`<button class="btn btn-primary" id="btn-nueva-pieza">${ico("plus")} Nueva pieza</button>`:""}
+  </div>
+  <div class="tabs" id="sem-tabs">
+    ${[1,2,3,4].map((s,i)=>`<button class="tab ${i===0?"active":""}" data-sem="${s}">Semana ${s}</button>`).join("")}
+  </div>
+  <div id="sem-panel"></div>`;
+
+  let semActiva=1;
+  function renderSem(s){
+    const ps = semanas[s]||[];
+    if(!ps.length){
+      document.getElementById("sem-panel").innerHTML=`<div class="empty-state">${ico("calendar")}<h3>Sin contenidos en esta semana</h3><p>${isAdmin()?"Agrega piezas con el botón de arriba":"El equipo aún no ha subido contenidos para esta semana"}</p></div>`;
+      return;
+    }
+    document.getElementById("sem-panel").innerHTML=`
+    <div class="table-wrap"><table>
+      <thead><tr><th>Día</th><th>Tipo</th><th>Red</th><th>Descripción</th><th>Archivo</th><th>Estado</th>${!isAdmin()?"<th>Acciones</th>":""}<th></th></tr></thead>
+      <tbody>${ps.map(p=>`<tr>
+        <td>${p.dia||"—"}</td>
+        <td><span class="chip">${p.tipo||"Post"}</span></td>
+        <td>${canalBadge(p.red||"")}</td>
+        <td class="truncate" style="max-width:180px">${p.descripcion||"—"}</td>
+        <td>${p.link?`<a href="${p.link}" target="_blank" style="font-size:12px">Ver archivo</a>`:"—"}</td>
+        <td>${statusBadge(p.status||"pendiente")}</td>
+        ${!isAdmin()?`<td>${(p.status==="pendiente"||p.status==="revision")?`
+          <div class="flex gap-1">
+            <button class="btn btn-sm" style="background:var(--success);color:#fff" onclick="window._aprobPieza('${wsId}','${p.id}','aprobado')">${ico("check")}</button>
+            <button class="btn btn-sm btn-danger" onclick="window._aprobPieza('${wsId}','${p.id}','rechazado')">${ico("x")}</button>
+          </div>`:"—"}</td>`:""}
+        <td>${isAdmin()?`<button class="btn-icon" onclick="window._delPieza('${wsId}','${p.id}')">${ico("trash")}</button>`:""}</td>
+      </tr>`).join("")}
+      </tbody>
+    </table></div>`;
+  }
+  renderSem(1);
+
+  document.getElementById("sem-tabs")?.querySelectorAll(".tab").forEach(t=>{
+    t.addEventListener("click",()=>{
+      document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+      t.classList.add("active");
+      semActiva=parseInt(t.dataset.sem);
+      renderSem(semActiva);
+    });
+  });
+
+  document.getElementById("btn-nueva-pieza")?.addEventListener("click",()=>openModalPieza(wsId,mes,semActiva,()=>renderSection("contenidos")));
+
+  window._aprobPieza=async(wid,pid,status)=>{
+    await updateDoc(doc(db,"workspaces",wid,"contenidos",pid),{status,revisadoEn:serverTimestamp()});
+    toast(`Pieza ${status}`,"success"); renderSection("contenidos");
+  };
+  window._delPieza=async(wid,pid)=>{
+    if(!confirm("¿Eliminar pieza?")) return;
+    await deleteDoc(doc(db,"workspaces",wid,"contenidos",pid));
+    toast("Eliminada","success"); renderSection("contenidos");
+  };
+}
+
+function openModalPieza(wsId,mes,semActiva,cb){
+  const ov=document.createElement("div"); ov.className="modal-overlay";
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-header"><div class="modal-title">Nueva pieza de contenido</div><button class="btn-icon" id="mc-close">${ico("x")}</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Semana</label>
+          <select class="form-select" id="mc-sem">${[1,2,3,4].map(s=>`<option value="${s}" ${semActiva===s?"selected":"" }>Semana ${s}</option>`).join("")}</select></div>
+        <div class="form-group"><label class="form-label">Día</label>
+          <select class="form-select" id="mc-dia">${["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"].map(d=>`<option>${d}</option>`).join("")}</select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tipo</label>
+          <select class="form-select" id="mc-tipo"><option>Reel</option><option>Post</option><option>Story</option><option>Carrusel</option><option>Video</option></select></div>
+        <div class="form-group"><label class="form-label">Red Social</label>
+          <select class="form-select" id="mc-red"><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="whatsapp">WhatsApp</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Descripción / Tema</label><textarea class="form-textarea" id="mc-desc" placeholder="De qué trata esta pieza…"></textarea></div>
+      <div class="form-group"><label class="form-label">Link de archivo / Drive</label><input class="form-input" id="mc-link" placeholder="https://drive.google.com/…" /></div>
+      <div class="form-group"><label class="form-label">Estado</label>
+        <select class="form-select" id="mc-status"><option value="revision">En revisión</option><option value="pendiente">Pendiente</option><option value="aprobado">Aprobado</option><option value="publicado">Publicado</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="mc-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="mc-save">${ico("check")} Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  document.getElementById("mc-close").onclick=close;
+  document.getElementById("mc-cancel").onclick=close;
+  ov.addEventListener("click",e=>{ if(e.target===ov) close(); });
+  document.getElementById("mc-save").onclick=async()=>{
+    const btn=document.getElementById("mc-save"); btn.disabled=true; btn.textContent="Guardando…";
+    try{
+      await addDoc(collection(db,"workspaces",wsId,"contenidos"),{
+        mes, semana:parseInt(document.getElementById("mc-sem").value),
+        dia:document.getElementById("mc-dia").value, tipo:document.getElementById("mc-tipo").value,
+        red:document.getElementById("mc-red").value, descripcion:document.getElementById("mc-desc").value,
+        link:document.getElementById("mc-link").value, status:document.getElementById("mc-status").value,
+        creadoPor:S.user.uid, creadoEn:serverTimestamp()
+      });
+      toast("Pieza guardada","success"); close(); cb&&cb();
+    }catch(e){ toast("Error","error"); btn.disabled=false; btn.textContent="Guardar"; }
+  };
+}
+
+// ─────────────────────────────────────────
+// WORKSPACES
+// ─────────────────────────────────────────
+async function secWorkspaces(el){
+  if(!isAdmin()){ el.innerHTML=`<div class="empty-state"><h3>Acceso restringido</h3></div>`; return; }
+  const snap=await getDocs(collection(db,"workspaces"));
+  S.workspaces=snap.docs.map(d=>({id:d.id,...d.data()}));
+
+  el.innerHTML=`
+  <div class="page-header">
+    <div><div class="page-title">Workspaces</div><div class="page-subtitle">${S.workspaces.length} clientes</div></div>
+    <button class="btn btn-primary" id="btn-nuevo-ws">${ico("plus")} Nuevo Workspace</button>
+  </div>
+  <div class="grid-3" id="ws-grid">
+    ${S.workspaces.length===0
+      ? `<div class="empty-state" style="grid-column:1/-1">${ico("briefcase")}<h3>Sin workspaces</h3><p>Crea el primero.</p></div>`
+      : S.workspaces.map(w=>`
+      <div class="card">
+        <div class="flex items-center gap-3 mb-4">
+          ${w.logo?`<img src="${w.logo}" style="width:40px;height:40px;border-radius:8px;object-fit:cover" />`:`<div class="avatar avatar-lg" style="border-radius:8px">${initials(w.name)}</div>`}
+          <div><div class="font-head font-800">${w.name}</div><div class="text-sm text-muted">${w.cliente||"Sin cliente"}</div></div>
+        </div>
+        <div class="stat-row"><span class="stat-key">Meta mensual</span><span class="stat-val text-primary">${fmtMXN(w.metaMensual||0)}</span></div>
+        <div class="stat-row"><span class="stat-key">Industria</span><span class="stat-val">${w.industria||"—"}</span></div>
+        <div class="flex gap-2 mt-4">
+          <button class="btn btn-secondary btn-sm" onclick="window._editWs('${w.id}')">${ico("edit")} Editar</button>
+          <button class="btn btn-ghost btn-sm" onclick="window._verDashWs('${w.id}')">${ico("eye")} Ver</button>
+          <button class="btn-icon" onclick="window._delWs('${w.id}')">${ico("trash")}</button>
+        </div>
+      </div>`).join("")}
+  </div>`;
+
+  document.getElementById("btn-nuevo-ws").addEventListener("click",()=>openModalWs(null,()=>renderSection("workspaces")));
+  window._editWs=(id)=>openModalWs(S.workspaces.find(w=>w.id===id),()=>renderSection("workspaces"));
+  window._verDashWs=(id)=>{ S.currentWorkspace=S.workspaces.find(w=>w.id===id)||null; S.section="dashboard"; updateNav(); renderSection("dashboard"); };
+  window._delWs=async(id)=>{
+    if(!confirm("¿Eliminar workspace?")) return;
+    await deleteDoc(doc(db,"workspaces",id));
+    toast("Eliminado","success"); renderSection("workspaces");
+  };
+}
+
+function openModalWs(ws,cb){
+  const isEdit=!!ws;
+  const ov=document.createElement("div"); ov.className="modal-overlay";
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-header"><div class="modal-title">${isEdit?"Editar":"Nuevo"} Workspace</div><button class="btn-icon" id="mw-close">${ico("x")}</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nombre <span class="req">*</span></label><input class="form-input" id="mw-name" value="${ws?.name||""}" placeholder="ej. Dr. Maravert" /></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Cliente / Empresa</label><input class="form-input" id="mw-cliente" value="${ws?.cliente||""}" placeholder="Empresa del cliente" /></div>
+        <div class="form-group"><label class="form-label">Industria</label><input class="form-input" id="mw-industria" value="${ws?.industria||""}" placeholder="ej. Salud, Restaurante" /></div>
+      </div>
+      <div class="form-group"><label class="form-label">Meta Mensual (MXN)</label><input class="form-input" id="mw-meta" type="number" value="${ws?.metaMensual||""}" placeholder="0" /></div>
+      <div class="form-group"><label class="form-label">URL del Logo</label><input class="form-input" id="mw-logo" value="${ws?.logo||""}" placeholder="https://…" /></div>
+      <div class="form-group"><label class="form-label">Notas internas</label><textarea class="form-textarea" id="mw-notas">${ws?.notas||""}</textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="mw-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="mw-save">${ico("check")} ${isEdit?"Actualizar":"Crear"}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  document.getElementById("mw-close").onclick=close;
+  document.getElementById("mw-cancel").onclick=close;
+  ov.addEventListener("click",e=>{ if(e.target===ov) close(); });
+  document.getElementById("mw-save").onclick=async()=>{
+    const name=document.getElementById("mw-name").value.trim();
+    if(!name){ toast("El nombre es requerido","error"); return; }
+    const btn=document.getElementById("mw-save"); btn.disabled=true; btn.textContent="Guardando…";
+    const data={name,cliente:document.getElementById("mw-cliente").value,industria:document.getElementById("mw-industria").value,metaMensual:parseFloat(document.getElementById("mw-meta").value||0),logo:document.getElementById("mw-logo").value,notas:document.getElementById("mw-notas").value,updatedAt:serverTimestamp()};
+    try{
+      if(isEdit){ await updateDoc(doc(db,"workspaces",ws.id),data); toast("Actualizado","success"); }
+      else{ await addDoc(collection(db,"workspaces"),{...data,creadoEn:serverTimestamp()}); toast("Workspace creado","success"); }
+      close(); cb&&cb();
+    }catch(e){ toast("Error","error"); btn.disabled=false; }
+  };
+}
+
+// ─────────────────────────────────────────
+// USUARIOS
+// ─────────────────────────────────────────
+async function secUsuarios(el){
+  if(!isAdmin()){ el.innerHTML=`<div class="empty-state"><h3>Acceso restringido</h3></div>`; return; }
+  if(!S.workspaces.length){ const s=await getDocs(collection(db,"workspaces")); S.workspaces=s.docs.map(d=>({id:d.id,...d.data()})); }
+  const snap=await getDocs(collection(db,"users"));
+  const users=snap.docs.map(d=>({id:d.id,...d.data()}));
+
+  el.innerHTML=`
+  <div class="page-header">
+    <div><div class="page-title">Usuarios</div><div class="page-subtitle">${users.length} registrados</div></div>
+    <button class="btn btn-primary" id="btn-nuevo-u">${ico("plus")} Crear Usuario</button>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Workspace</th><th></th></tr></thead>
+    <tbody>${users.length===0?`<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">Sin usuarios</td></tr>`:
+    users.map(u=>{
+      const ws=S.workspaces.find(w=>w.id===u.workspaceId);
+      return `<tr>
+        <td><div class="flex items-center gap-2"><div class="avatar">${initials(u.name||u.email)}</div><span class="font-bold">${u.name||"—"}</span></div></td>
+        <td>${u.email||"—"}</td><td>${rolBadge(u.role)}</td>
+        <td>${ws?.name||"—"}</td>
+        <td><div class="flex gap-1">
+          <button class="btn-icon" onclick="window._editU('${u.id}')">${ico("edit")}</button>
+          <button class="btn-icon" onclick="window._delU('${u.id}')">${ico("trash")}</button>
+        </div></td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table></div>`;
+
+  document.getElementById("btn-nuevo-u").addEventListener("click",()=>openModalUsuario(null,()=>renderSection("usuarios")));
+  window._editU=(id)=>openModalUsuario(users.find(u=>u.id===id),()=>renderSection("usuarios"));
+  window._delU=async(id)=>{
+    if(!confirm("¿Eliminar usuario?")) return;
+    await deleteDoc(doc(db,"users",id));
+    toast("Usuario eliminado","success"); renderSection("usuarios");
+  };
+}
+
+function openModalUsuario(usr,cb){
+  const isEdit=!!usr;
+  const ov=document.createElement("div"); ov.className="modal-overlay";
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-header"><div class="modal-title">${isEdit?"Editar":"Crear"} Usuario</div><button class="btn-icon" id="mu-close">${ico("x")}</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="mu-name" value="${usr?.name||""}" placeholder="Juan Pérez" /></div>
+      ${!isEdit?`
+      <div class="form-group"><label class="form-label">Email <span class="req">*</span></label><input class="form-input" id="mu-email" type="email" placeholder="juan@empresa.mx" /></div>
+      <div class="form-group"><label class="form-label">Contraseña temporal <span class="req">*</span></label><input class="form-input" id="mu-pass" type="password" placeholder="Mínimo 6 caracteres" /></div>
+      <p class="form-hint">⚠️ El usuario se crea en Firebase Auth. Asegúrate de copiar sus credenciales.</p>`
+      :`<p class="text-sm text-muted">Email: ${usr?.email||"—"}</p>`}
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Rol</label>
+          <select class="form-select" id="mu-role">
+            <option value="cliente" ${usr?.role==="cliente"?"selected":""}>Cliente</option>
+            <option value="admin" ${usr?.role==="admin"?"selected":""}>Admin</option>
+          </select></div>
+        <div class="form-group"><label class="form-label">Workspace</label>
+          <select class="form-select" id="mu-ws">
+            <option value="">Sin workspace</option>
+            ${S.workspaces.map(w=>`<option value="${w.id}" ${usr?.workspaceId===w.id?"selected":""}>${w.name}</option>`).join("")}
+          </select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="mu-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="mu-save">${ico("check")} ${isEdit?"Actualizar":"Crear"}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  document.getElementById("mu-close").onclick=close;
+  document.getElementById("mu-cancel").onclick=close;
+  ov.addEventListener("click",e=>{ if(e.target===ov) close(); });
+  document.getElementById("mu-save").onclick=async()=>{
+    const btn=document.getElementById("mu-save"); btn.disabled=true; btn.textContent="Guardando…";
+    const data={name:document.getElementById("mu-name").value,role:document.getElementById("mu-role").value,workspaceId:document.getElementById("mu-ws").value||null,updatedAt:serverTimestamp()};
+    try{
+      if(isEdit){
+        await updateDoc(doc(db,"users",usr.id),data); toast("Actualizado","success");
+      } else {
+        const email=document.getElementById("mu-email").value.trim();
+        const pass=document.getElementById("mu-pass").value;
+        if(!email||!pass){ toast("Email y contraseña requeridos","error"); btn.disabled=false; return; }
+        // Nota: crear Auth desde cliente requiere que el admin esté autenticado con el mismo proyecto
+        // Se guarda en Firestore y se crea desde Firebase Console o Admin SDK
+        await addDoc(collection(db,"users_pending"),{...data,email,creadoEn:serverTimestamp()});
+        toast("Guardado. Crea el acceso en Firebase Auth Console.","info");
+      }
+      close(); cb&&cb();
+    }catch(e){ toast("Error: "+e.message,"error"); btn.disabled=false; }
+  };
+}
+
+// ─────────────────────────────────────────
+// CONFIGURACIÓN DE MARCA
+// ─────────────────────────────────────────
+async function secConfiguracion(el){
+  if(!isAdmin()){ el.innerHTML=`<div class="empty-state"><h3>Acceso restringido</h3></div>`; return; }
+  let cfg={};
+  try{ const d=await getDoc(doc(db,"config","marca")); if(d.exists()) cfg=d.data(); }catch(e){}
+  const palette=["#e8ff47","#ff4757","#2ed573","#1e90ff","#a29bfe","#fd79a8","#fdcb6e","#ffffff"];
+
+  el.innerHTML=`
+  <div class="page-header">
+    <div><div class="page-title">Configuración de Marca</div><div class="page-subtitle">Personaliza la apariencia del CRM</div></div>
+    <button class="btn btn-primary" id="btn-save-cfg">${ico("check")} Guardar cambios</button>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-title">Identidad</div>
+      <div class="flex flex-col gap-4">
+        <div class="form-group"><label class="form-label">Nombre de la agencia</label><input class="form-input" id="cfg-nombre" value="${cfg.companyName||"Bravo Agency"}" /></div>
+        <div class="form-group"><label class="form-label">Slogan</label><input class="form-input" id="cfg-tagline" value="${cfg.tagline||""}" placeholder="Resultados que se ven" /></div>
+        <div class="form-group"><label class="form-label">URL del Logo</label><input class="form-input" id="cfg-logo" value="${cfg.logo||""}" placeholder="https://…" /></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Color Principal</div>
+      <div class="flex flex-wrap gap-2 mb-4">
+        ${palette.map(c=>`<div class="color-swatch ${(cfg.primary||"#e8ff47")===c?"selected":""}" style="background:${c}" data-color="${c}" onclick="document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('selected'));this.classList.add('selected');document.getElementById('cfg-primary').value='${c}';document.getElementById('cfg-preview').style.background='${c}'"></div>`).join("")}
+      </div>
+      <div class="form-group">
+        <label class="form-label">HEX personalizado</label>
+        <div class="flex gap-2 items-center">
+          <input class="form-input font-mono" id="cfg-primary" value="${cfg.primary||"#e8ff47"}" placeholder="#e8ff47" />
+          <div id="cfg-preview" style="width:36px;height:36px;border-radius:6px;background:${cfg.primary||"#e8ff47"};border:1px solid var(--border);flex-shrink:0"></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById("cfg-primary")?.addEventListener("input",e=>{ document.getElementById("cfg-preview").style.background=e.target.value; });
+  document.getElementById("btn-save-cfg")?.addEventListener("click",async()=>{
+    const btn=document.getElementById("btn-save-cfg"); btn.disabled=true; btn.textContent="Guardando…";
+    const data={companyName:document.getElementById("cfg-nombre").value,tagline:document.getElementById("cfg-tagline").value,logo:document.getElementById("cfg-logo").value,primary:document.getElementById("cfg-primary").value,updatedAt:serverTimestamp()};
+    try{
+      await setDoc(doc(db,"config","marca"),data);
+      if(data.primary) document.documentElement.style.setProperty("--primary",data.primary);
+      toast("Configuración guardada","success");
+    }catch(e){ toast("Error","error"); }
+    btn.disabled=false; btn.innerHTML=`${ico("check")} Guardar cambios`;
+  });
+}
+
+// ─────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────
+function emptyWs(){
+  return `<div class="empty-state">${ico("briefcase")}<h3>Sin workspace activo</h3><p>Selecciona un workspace desde el menú superior.</p></div>`;
+}
+
+// ─────────────────────────────────────────
+// AUTH LISTENER — ARRANQUE
+// ─────────────────────────────────────────
+onAuthStateChanged(auth, async user=>{
+  if(!user){ S.user=null; S.profile=null; hideLoading(); render(); return; }
+  S.user=user;
+  try{
+    const pd=await getDoc(doc(db,"users",user.uid));
+    if(pd.exists()){ S.profile={id:pd.id,...pd.data()}; }
+    else{
+      const basic={email:user.email,role:"cliente",name:user.displayName||user.email,creadoEn:serverTimestamp()};
+      await setDoc(doc(db,"users",user.uid),basic);
+      S.profile={id:user.uid,...basic};
+    }
+  }catch(e){ S.profile={id:user.uid,email:user.email,role:"cliente"}; }
+
+  try{
+    if(isAdmin()){
+      const snap=await getDocs(collection(db,"workspaces"));
+      S.workspaces=snap.docs.map(d=>({id:d.id,...d.data()}));
+      S.currentWorkspace=S.workspaces[0]||null;
+      S.section="panel-agencia";
+    } else if(S.profile.workspaceId){
+      const wd=await getDoc(doc(db,"workspaces",S.profile.workspaceId));
+      if(wd.exists()){ S.workspaces=[{id:wd.id,...wd.data()}]; S.currentWorkspace=S.workspaces[0]; }
+      S.section="dashboard";
+    }
+  }catch(e){ console.error("Error workspaces",e); }
+
+  try{
+    const cd=await getDoc(doc(db,"config","marca"));
+    if(cd.exists()&&cd.data().primary) document.documentElement.style.setProperty("--primary",cd.data().primary);
+  }catch(e){}
+
+  hideLoading(); render();
+});
+</script>
+</body>
+</html>
