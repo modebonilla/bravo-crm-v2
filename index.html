@@ -501,7 +501,12 @@ function renderShell(){
   const navAdmin = isAdmin() ? `
     <div class="nav-label">Agencia</div>
     <button class="nav-item ${sec==="panel-agencia"?"active":""}" data-section="panel-agencia">${ico("grid")} Panel de Agencia</button>
+    <div class="nav-label">Cliente activo</div>
+    <button class="nav-item ${sec==="dashboard"?"active":""}" data-section="dashboard">${ico("grid")} Dashboard</button>
+    <button class="nav-item ${sec==="roas"?"active":""}" data-section="roas">${ico("bar-chart")} ROAS</button>
+    <button class="nav-item ${sec==="metricas"?"active":""}" data-section="metricas">${ico("trending-up")} Métricas</button>
     <button class="nav-item ${sec==="contenidos"?"active":""}" data-section="contenidos">${ico("calendar")} Contenidos <span id="notif-badge" style="display:none;background:var(--error);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;margin-left:auto">!</span></button>
+    <button class="nav-item ${sec==="prospectos"?"active":""}" data-section="prospectos">${ico("users")} Prospectos</button>
     <div class="nav-label">Administración</div>
     <button class="nav-item ${sec==="workspaces"?"active":""}" data-section="workspaces">${ico("briefcase")} Workspaces</button>
     <button class="nav-item ${sec==="usuarios"?"active":""}" data-section="usuarios">${ico("users")} Usuarios</button>
