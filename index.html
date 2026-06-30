@@ -3221,18 +3221,18 @@ onAuthStateChanged(auth, async user=>{
       <div style="text-align:center;max-width:300px;padding:24px">
         <div class="logo-text" style="font-size:22px;margin-bottom:24px">BRAVO CRM</div>
         <div class="spinner" style="margin:0 auto 20px"></div>
-        <p style="color:var(--text-muted);font-size:14px;margin-bottom:8px">Estamos cargando tu información…</p>
-        <p style="color:var(--text-muted);font-size:12px;margin-bottom:24px">Esto solo toma unos segundos</p>
-        <button id="btn-reintentar" class="btn btn-primary w-full" style="display:none" onclick="window.location.reload()">
-          ✓ Ya estoy listo — Entrar
-        </button>
+        <p style="color:var(--text-muted);font-size:14px;margin-bottom:8px">Estamos cargando tu cuenta…</p>
+        <p style="color:var(--text-muted);font-size:12px">Un momento por favor</p>
       </div>
     </div>`;
-  // Mostrar botón de reintento después de 6 segundos
+  // Si tarda más de 8 segundos, forzar render con lo que hay
   setTimeout(()=>{
-    const btn = document.getElementById("btn-reintentar");
-    if(btn) btn.style.display="flex";
-  }, 6000);
+    if(document.getElementById("carga-screen")){
+      hideLoading();
+      if(S.user && !S.profile) S.profile={id:S.user.uid,email:S.user.email,role:"cliente"};
+      if(S.user) render();
+    }
+  }, 8000);
 
   try{
     // Perfil y config en paralelo
