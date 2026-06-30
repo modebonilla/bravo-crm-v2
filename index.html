@@ -29,7 +29,7 @@ button,input,select,textarea{font-family:var(--font-body)}
 
 /* LAYOUT */
 .app-shell{display:flex;height:100vh;overflow:hidden}
-.sidebar{width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:fixed;left:0;top:0;z-index:200;transition:transform .3s ease;overflow-y:auto}
+.sidebar{width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:fixed;left:0;top:0;z-index:200;transition:transform .3s ease;overflow-y:hidden}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:#000a;z-index:199;cursor:pointer}
 .main-content{flex:1;display:flex;flex-direction:column;margin-left:var(--sidebar);overflow:hidden}
 .topbar{height:var(--topbar);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0}
@@ -540,15 +540,15 @@ function renderShell(){
         <div class="logo-sub">v2 · ${p?.role||"cliente"}</div>
       </div>
       <nav class="sidebar-nav">${navAdmin}</nav>
-      <div class="sidebar-footer">
-        <div class="flex items-center gap-2 mb-2">
+      <div class="sidebar-footer" style="padding:10px 8px">
+        <div class="flex items-center gap-2">
           <div class="avatar">${initials(p?.name||p?.email)}</div>
           <div class="truncate" style="flex:1">
             <div class="text-sm font-bold truncate">${p?.name||"Usuario"}</div>
             <div class="text-sm text-muted truncate">${p?.email||""}</div>
           </div>
+          <button class="btn-icon" id="btn-logout" title="Cerrar sesión" style="flex-shrink:0">${ico("log-out")}</button>
         </div>
-        <button class="btn btn-ghost btn-sm w-full" id="btn-logout">${ico("log-out")} Cerrar sesión</button>
       </div>
     </aside>
     <div class="main-content">
@@ -2121,8 +2121,8 @@ function openViewer(p){
       ${isAdmin() ? `
       <div class="divider"></div>
       <div class="flex gap-2">
-        <button class="btn btn-secondary" style="flex:1" onclick="document.querySelector('.modal-overlay').remove();window._editPieza('${p.id}')">${ico("edit")} Editar pieza</button>
-        <button class="btn btn-danger btn-sm" onclick="if(confirm('¿Eliminar esta pieza?')){document.querySelector('.modal-overlay').remove();window._delPieza('${p.wsId}','${p.id}')}">${ico("trash")} Eliminar</button>
+        <button class="btn btn-secondary" style="flex:1" id="vw-edit-btn">✏️ Editar pieza</button>
+        <button class="btn btn-danger btn-sm" id="vw-del-btn">🗑 Eliminar</button>
       </div>` : ""}
     </div>
   </div>`;
@@ -2130,6 +2130,11 @@ function openViewer(p){
   const close=()=>ov.remove();
   document.getElementById("vw-close").onclick=close;
   ov.addEventListener("click",e=>{ if(e.target===ov) close(); });
+  // Botones admin
+  document.getElementById("vw-edit-btn")?.addEventListener("click",()=>{ close(); window._editPieza(p.id); });
+  document.getElementById("vw-del-btn")?.addEventListener("click",()=>{
+    if(confirm("¿Eliminar esta pieza?")){ close(); window._delPieza(p.wsId, p.id); }
+  });
 }
 
 window._accionPieza=async(wid,pid,status,comentario)=>{
