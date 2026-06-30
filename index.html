@@ -1367,12 +1367,12 @@ const CLOUDINARY_PRESET = "bravo-crm";
 
 async function uploadToCloudinary(file){
   const isVideo = file.type.startsWith("video/");
-  const endpoint = isVideo ? "video" : "image";
   const fd = new FormData();
   fd.append("file", file);
   fd.append("upload_preset", CLOUDINARY_PRESET);
   fd.append("folder", "bravo-crm");
-  const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${endpoint}/upload`;
+  // Usar /auto/upload — funciona con preset unsigned para imagen y video
+  const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`;
   let res;
   try{
     res = await fetch(url, {method:"POST", body:fd});
