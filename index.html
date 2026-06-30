@@ -230,6 +230,19 @@ tr:hover td{background:var(--surface-el);color:var(--text)}
   .filters-bar .form-group{flex:1 1 100%}
 }
 
+/* ── CRM KANBAN ── */
+.kanban-board{display:flex;gap:16px;overflow-x:auto;padding-bottom:16px;min-height:400px}
+.kanban-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);min-width:250px;max-width:270px;flex-shrink:0;display:flex;flex-direction:column}
+.kanban-col-header{padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.kanban-col-title{font-family:var(--font-head);font-size:13px;font-weight:700}
+.kanban-col-count{font-size:11px;color:var(--text-muted);background:var(--surface-el);border-radius:100px;padding:2px 8px}
+.kanban-col-body{padding:10px;display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto}
+.kanban-card{background:var(--surface-el);border:1px solid var(--border);border-radius:var(--r);padding:12px;cursor:pointer;transition:all var(--tr)}
+.kanban-card:hover{border-color:var(--text-muted);transform:translateY(-1px)}
+.kanban-card-name{font-weight:700;font-size:13px;margin-bottom:4px}
+.kanban-card-meta{font-size:11px;color:var(--text-muted);margin-bottom:6px}
+.kanban-card-monto{font-family:var(--font-head);font-size:14px;font-weight:800;color:var(--primary)}
+
 /* ── CALENDARIO DE CONTENIDOS ── */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;background:var(--border);border-radius:var(--r-lg);overflow:hidden}
 .cal-header-day{background:var(--surface-el);padding:8px 4px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)}
@@ -500,6 +513,8 @@ function renderShell(){
     <button class="nav-item ${sec==="registrar-venta"?"active":""}" data-section="registrar-venta">${ico("plus-circle")} Registrar Venta</button>
     <button class="nav-item ${sec==="mis-ventas"?"active":""}" data-section="mis-ventas">${ico("dollar")} Mis Ventas</button>
     <button class="nav-item ${sec==="roas"?"active":""}" data-section="roas">${ico("bar-chart")} ROAS Calculator</button>
+    <button class="nav-item ${sec==="metricas"?"active":""}" data-section="metricas">${ico("trending-up")} Métricas</button>
+    <button class="nav-item ${sec==="prospectos"?"active":""}" data-section="prospectos">${ico("users")} Prospectos</button>
     <button class="nav-item ${sec==="contenidos"?"active":""}" data-section="contenidos">${ico("calendar")} Contenidos <span id="notif-badge" style="display:none;background:var(--error);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;margin-left:auto">!</span></button>
   `;
 
@@ -538,10 +553,12 @@ function renderShell(){
         <button class="hamburger" id="hamburger">${ico("menu")}</button>
         <div style="flex:1">
           <div style="font-size:13px;font-weight:600" id="topbar-title">—</div>
-          ${isAdmin()&&S.currentWorkspace?`<div class="text-sm text-muted">Workspace: ${S.currentWorkspace.name}</div>`:""}
+          <div class="text-sm text-muted" id="topbar-sub" style="${isAdmin()&&S.currentWorkspace&&S.section!=='panel-agencia'?'':'display:none'}">${isAdmin()&&S.currentWorkspace?`Workspace: ${S.currentWorkspace.name}`:""}</div>
         </div>
-        ${wsLink}
-        ${wsSwitcher}
+        <div id="topbar-actions" style="${S.section==='panel-agencia'?'display:none':''}">
+          ${wsLink}
+          ${wsSwitcher}
+        </div>
       </header>
       <main class="page-content" id="section-content"></main>
     </div>
@@ -588,7 +605,7 @@ const TITLES = {
   "registrar-venta":"Registrar Venta","mis-ventas":"Mis Ventas",
   roas:"ROAS Calculator","contenidos":"Programación de Contenidos",
   workspaces:"Workspaces","usuarios":"Usuarios",
-  "todas-ventas":"Todas las Ventas","configuracion":"Configuración de Marca"
+  "todas-ventas":"Todas las Ventas","configuracion":"Configuración de Marca","metricas":"Métricas de Campaña","prospectos":"CRM de Prospectos"
 };
 
 async function renderSection(sec){
@@ -604,6 +621,8 @@ async function renderSection(sec){
       case "registrar-venta":  await secRegistrarVenta(el); break;
       case "mis-ventas":       await secMisVentas(el); break;
       case "roas":             await secROAS(el); break;
+      case "metricas":         await secMetricas(el); break;
+      case "prospectos":       await secProspectos(el); break;
       case "contenidos":       await secContenidos(el); break;
       case "workspaces":       await secWorkspaces(el); break;
       case "usuarios":         await secUsuarios(el); break;
@@ -781,6 +800,40 @@ async function secPanelAgencia(el){
 
     <div class="grid-2 mb-4">
       <div class="card">
+        <div class="section-title">Códigos de campaña — por monto</div>
+        ${(()=>{
+          const freq={};
+          vf.forEach(v=>{ if(v.campana){ freq[v.campana]=(freq[v.campana]||0)+(v.monto||0); }});
+          const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,6);
+          if(!sorted.length) return '<div class="empty-state" style="padding:24px"><h3>Sin códigos registrados</h3></div>';
+          const CAMP_COLORS=["#e8ff47","#3b82f6","#22c55e","#f59e0b","#a855f7","#ef4444"];
+          return graficaPastel(sorted.map(([label,valor],i)=>({label,valor,color:CAMP_COLORS[i%CAMP_COLORS.length]})));
+        })()}
+      </div>
+      <div class="card">
+        <div class="section-title">Top códigos de campaña</div>
+        ${(()=>{
+          const freq={};
+          vf.forEach(v=>{ if(v.campana){ freq[v.campana]=(freq[v.campana]||0)+(v.monto||0); }});
+          const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,8);
+          if(!sorted.length) return '<div class="text-muted text-sm" style="padding:12px 0">Sin datos</div>';
+          const maxV=sorted[0][1]||1;
+          return sorted.map(([code,val])=>`
+            <div class="stat-row">
+              <span class="stat-key font-mono" style="font-size:12px">${code}</span>
+              <div class="flex items-center gap-2">
+                <div style="width:60px;background:var(--border);border-radius:4px;height:4px">
+                  <div style="background:var(--primary);height:100%;width:${Math.round((val/maxV)*100)}%;border-radius:4px"></div>
+                </div>
+                <span class="stat-val">${fmtMXN(val)}</span>
+              </div>
+            </div>`).join("");
+        })()}
+      </div>
+    </div>
+
+    <div class="grid-2 mb-4">
+      <div class="card">
         <div class="section-title">Ranking de clientes</div>
         ${ranking.map((w,i)=>`
         <div class="ranking-item">
@@ -811,7 +864,53 @@ async function secPanelAgencia(el){
             </tr>`).join("")}</tbody>
           </table></div>`}
       </div>
-    </div>`;
+
+    ${(()=>{
+      if(!ultimoROAS) return "";
+      const cls=roasClasificacion(parseFloat(ultimoROAS.roas||0));
+      return `<div class="card mt-4" id="dash-roas-card">
+        <div class="flex justify-between items-center mb-4">
+          <div class="section-title" style="margin-bottom:0;border:none;padding:0">📊 ROAS — ${ultimoROAS.nombre||"Último reporte"}</div>
+          <span class="text-sm text-muted">${ultimoROAS.periodo||fmtDate(ultimoROAS.creadoEn)}</span>
+        </div>
+        <div class="grid-2">
+          <div class="roas-display" style="border-color:${cls.color}">
+            <div class="roas-number" style="color:${cls.color}">${ultimoROAS.roas}x</div>
+            <div class="roas-label">Retorno en Ads</div>
+          </div>
+          <div>
+            <div class="stat-row"><span class="stat-key">Inversión</span><span class="stat-val">${fmtMXN(ultimoROAS.inversion||0)}</span></div>
+            <div class="stat-row"><span class="stat-key">Ingresos</span><span class="stat-val text-success">${fmtMXN(ultimoROAS.ingresos||0)}</span></div>
+            <div class="stat-row"><span class="stat-key">ROI</span><span class="stat-val" style="color:${cls.color}">${ultimoROAS.roi}%</span></div>
+            <div class="stat-row"><span class="stat-key">Clasificación</span><span class="stat-val" style="color:${cls.color}">${cls.emoji} ${cls.label}</span></div>
+          </div>
+        </div>
+      </div>`;
+    })()}
+    ${(()=>{
+      if(!ultimaMetrica) return "";
+      return `<div class="card mt-4" id="dash-metricas-card">
+        <div class="flex justify-between items-center mb-4">
+          <div class="section-title" style="margin-bottom:0;border:none;padding:0">📈 Métricas — ${ultimaMetrica.nombre||"Último reporte"}</div>
+          <span class="text-sm text-muted">${ultimaMetrica.periodo||fmtDate(ultimaMetrica.creadoEn)}</span>
+        </div>
+        <div class="grid-2">
+          <div>
+            ${ultimaMetrica.alcance?`<div class="stat-row"><span class="stat-key">👁 Alcance</span><span class="stat-val">${parseInt(ultimaMetrica.alcance).toLocaleString("es-MX")}</span></div>`:""}
+            ${ultimaMetrica.impresiones?`<div class="stat-row"><span class="stat-key">📢 Impresiones</span><span class="stat-val">${parseInt(ultimaMetrica.impresiones).toLocaleString("es-MX")}</span></div>`:""}
+            ${ultimaMetrica.interacciones?`<div class="stat-row"><span class="stat-key">❤️ Interacciones</span><span class="stat-val">${parseInt(ultimaMetrica.interacciones).toLocaleString("es-MX")}</span></div>`:""}
+            ${ultimaMetrica.clics?`<div class="stat-row"><span class="stat-key">👆 Clics</span><span class="stat-val">${parseInt(ultimaMetrica.clics).toLocaleString("es-MX")}</span></div>`:""}
+          </div>
+          <div>
+            ${ultimaMetrica.leads?`<div class="stat-row"><span class="stat-key">🎣 Leads</span><span class="stat-val">${parseInt(ultimaMetrica.leads).toLocaleString("es-MX")}</span></div>`:""}
+            ${ultimaMetrica.mensajes?`<div class="stat-row"><span class="stat-key">💬 Mensajes</span><span class="stat-val">${parseInt(ultimaMetrica.mensajes).toLocaleString("es-MX")}</span></div>`:""}
+            ${ultimaMetrica.seguidoresNuevos?`<div class="stat-row"><span class="stat-key">➕ Seguidores nuevos</span><span class="stat-val">${parseInt(ultimaMetrica.seguidoresNuevos).toLocaleString("es-MX")}</span></div>`:""}
+            ${ultimaMetrica.cpl?`<div class="stat-row"><span class="stat-key">💰 Costo por Lead</span><span class="stat-val">${fmtMXN(ultimaMetrica.cpl)}</span></div>`:""}
+          </div>
+        </div>
+        ${ultimaMetrica.observaciones?`<div style="margin-top:12px;background:var(--surface-el);border-radius:var(--r);padding:12px;border-left:3px solid var(--primary);font-size:13px">${ultimaMetrica.observaciones}</div>`:""}
+      </div>`;
+    })()}    </div>`;
   }
 
   el.innerHTML=`
@@ -864,11 +963,32 @@ async function secDashboard(el){
     });
   }
 
+  async function cargarExtras(){
+    // Cargar último ROAS publicado
+    let ultimoROAS=null;
+    try{
+      const rs=await getDocs(query(collection(db,"workspaces",wsId,"roas_reportes"),orderBy("creadoEn","desc")));
+      if(!rs.empty) ultimoROAS={id:rs.docs[0].id,...rs.docs[0].data()};
+    }catch(e){}
+    // Cargar última métrica publicada
+    let ultimaMetrica=null;
+    try{
+      const ms=await getDocs(query(collection(db,"workspaces",wsId,"metricas_reportes"),orderBy("creadoEn","desc")));
+      if(!ms.empty) ultimaMetrica={id:ms.docs[0].id,...ms.docs[0].data()};
+    }catch(e){}
+    return {ultimoROAS, ultimaMetrica};
+  }
+
+  let _extras=null;
+  cargarExtras().then(e=>{ _extras=e; renderDash(); });
+
   function renderDash(){
     const ventas=filtradas();
     const {total,ticket,porCanal,porMes}=calcMetricas(ventas);
     const pct=meta>0?Math.min(100,Math.round((total/meta)*100)):0;
     const recientes=ventas.slice(0,6);
+    const ultimoROAS=_extras?.ultimoROAS||null;
+    const ultimaMetrica=_extras?.ultimaMetrica||null;
 
     document.getElementById("dash-content").innerHTML=`
     <div class="metrics-grid">
@@ -882,7 +1002,7 @@ async function secDashboard(el){
         </div>
       </div>
       <div class="metric-card"><div class="metric-label">Ticket Promedio</div><div class="metric-value">${fmtMXN(ticket)}</div><div class="metric-sub">por venta</div></div>
-      <div class="metric-card"><div class="metric-label">Campañas activas</div><div class="metric-value">${[...new Set(ventas.map(v=>v.campana).filter(Boolean))].length}</div><div class="metric-sub">distintas</div></div>
+      <div class="metric-card"><div class="metric-label">Códigos activos</div><div class="metric-value">${[...new Set(ventas.map(v=>v.campana).filter(Boolean))].length}</div><div class="metric-sub">códigos de campaña</div></div>
     </div>
 
     <div class="grid-2 mb-4">
@@ -898,12 +1018,46 @@ async function secDashboard(el){
       </div>
     </div>
 
+    <div class="grid-2 mb-4">
+      <div class="card">
+        <div class="section-title">Códigos de campaña — por monto</div>
+        ${(()=>{
+          const freq={};
+          ventas.forEach(v=>{ if(v.campana){ freq[v.campana]=(freq[v.campana]||0)+(v.monto||0); }});
+          const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,6);
+          if(!sorted.length) return '<div class="empty-state" style="padding:24px"><h3>Sin códigos registrados</h3></div>';
+          const CAMP_COLORS=["#e8ff47","#3b82f6","#22c55e","#f59e0b","#a855f7","#ef4444"];
+          return graficaPastel(sorted.map(([label,valor],i)=>({label,valor,color:CAMP_COLORS[i%CAMP_COLORS.length]})));
+        })()}
+      </div>
+      <div class="card">
+        <div class="section-title">Top códigos de campaña</div>
+        ${(()=>{
+          const freq={};
+          ventas.forEach(v=>{ if(v.campana){ freq[v.campana]=(freq[v.campana]||0)+(v.monto||0); }});
+          const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,8);
+          if(!sorted.length) return '<div class="text-muted text-sm" style="padding:12px 0">Sin datos</div>';
+          const maxV=sorted[0][1]||1;
+          return sorted.map(([code,val])=>`
+            <div class="stat-row">
+              <span class="stat-key font-mono" style="font-size:12px">${code}</span>
+              <div class="flex items-center gap-2">
+                <div style="width:60px;background:var(--border);border-radius:4px;height:4px">
+                  <div style="background:var(--primary);height:100%;width:${Math.round((val/maxV)*100)}%;border-radius:4px"></div>
+                </div>
+                <span class="stat-val">${fmtMXN(val)}</span>
+              </div>
+            </div>`).join("");
+        })()}
+      </div>
+    </div>
+
     <div class="card">
       <div class="section-title">Últimas ventas</div>
       ${recientes.length===0
         ? `<div class="empty-state" style="padding:24px">${ico("dollar")}<h3>Sin ventas en este periodo</h3></div>`
         : `<div class="table-wrap"><table>
-          <thead><tr><th>Canal</th><th>Campaña</th><th>Producto</th><th>Monto</th><th>Fecha</th></tr></thead>
+          <thead><tr><th>Canal</th><th>Cód. Campaña</th><th>Producto</th><th>Monto</th><th>Fecha</th></tr></thead>
           <tbody>${recientes.map(v=>`<tr>
             <td>${canalBadge(v.canal||"",v.otroCual||"")}</td>
             <td>${v.campana||"—"}</td>
@@ -944,6 +1098,7 @@ async function secDashboard(el){
   document.getElementById("db-desde")?.addEventListener("change",e=>{fDesde=e.target.value;renderDash();});
   document.getElementById("db-hasta")?.addEventListener("change",e=>{fHasta=e.target.value;renderDash();});
   document.getElementById("btn-reg")?.addEventListener("click",()=>{ S.section="registrar-venta"; updateNav(); renderSection("registrar-venta"); });
+  document.getElementById("btn-pdf-dash")?.addEventListener("click",()=>imprimirDashboard(ws?.name||"Dashboard"));
 }
 
 // ─────────────────────────────────────────
@@ -1002,8 +1157,8 @@ async function secRegistrarVenta(el){
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Campaña</label>
-            <input class="form-input" id="v-campana" placeholder="Nombre de campaña" />
+            <label class="form-label">Código de campaña</label>
+            <input class="form-input" id="v-campana" placeholder="ej. CAM-JUL-01" />
           </div>
         </div>
         <div class="form-row">
@@ -1023,7 +1178,7 @@ async function secRegistrarVenta(el){
           </div>
           <div class="form-group">
             <label class="form-label">WhatsApp</label>
-            <input class="form-input" id="v-wa" type="tel" placeholder="+52 55 0000 0000" />
+            <input class="form-input" id="v-wa" type="tel" placeholder="10 dígitos ej. 5512345678" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" />
           </div>
         </div>
         <div class="form-group">
@@ -1174,7 +1329,7 @@ async function secMisVentas(el){
       <input class="form-input" id="mv-producto" placeholder="Buscar…" />
     </div>
     <div class="form-group">
-      <label class="form-label">Campaña</label>
+      <label class="form-label">Código de campaña</label>
       <input class="form-input" id="mv-campana" placeholder="Buscar…" />
     </div>
     <div class="form-group">
@@ -1188,7 +1343,7 @@ async function secMisVentas(el){
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Canal</th><th>Campaña</th><th>Producto</th><th>Monto</th><th>Cliente</th><th>Fecha</th><th></th></tr></thead>
+      <thead><tr><th>Canal</th><th>Cód. Campaña</th><th>Producto</th><th>Monto</th><th>Cliente</th><th>Fecha</th><th></th></tr></thead>
       <tbody id="mv-tbody"></tbody>
     </table>
   </div>`;
@@ -1275,7 +1430,7 @@ async function secTodasVentas(el){
   <div class="page-header">
     <div><div class="page-title">Todas las Ventas</div>
     <div class="page-subtitle" id="tv-count"></div></div>
-    <button class="btn btn-secondary" id="btn-csv">${ico("download")} Exportar CSV</button>
+    <button class="btn btn-secondary" id="btn-csv">${ico("download")} Exportar para Meta</button>
   </div>
   <div class="filters-bar">
     <div class="form-group">
@@ -1296,7 +1451,7 @@ async function secTodasVentas(el){
       <input class="form-input" id="f-producto" placeholder="Buscar…" />
     </div>
     <div class="form-group">
-      <label class="form-label">Campaña</label>
+      <label class="form-label">Código de campaña</label>
       <input class="form-input" id="f-campana" placeholder="Buscar…" />
     </div>
     <div class="form-group">
@@ -1310,7 +1465,7 @@ async function secTodasVentas(el){
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Cliente</th><th>Canal</th><th>Campaña</th><th>Producto</th><th>Monto</th><th>Cliente final</th><th>Vendedor</th><th>Fecha</th><th></th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Canal</th><th>Cód. Campaña</th><th>Producto</th><th>Monto</th><th>Cliente final</th><th>Vendedor</th><th>Fecha</th><th></th></tr></thead>
       <tbody id="tv-tbody"></tbody>
     </table>
   </div>`;
@@ -1371,7 +1526,7 @@ function openModalEditVenta(v, cb){
           <input class="form-input" id="ev-monto" type="number" value="${v.monto||0}" /></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Campaña</label>
+        <div class="form-group"><label class="form-label">Código de campaña</label>
           <input class="form-input" id="ev-campana" value="${v.campana||""}" /></div>
         <div class="form-group"><label class="form-label">Fecha</label>
           <input class="form-input" id="ev-fecha" type="date" value="${v.fecha?.toDate?(v.fecha.toDate().toISOString().slice(0,10)):"" }" /></div>
@@ -1432,16 +1587,221 @@ function ventasTable(ventas, showVendedor=false){
 }
 
 function exportCSV(ventas){
-  const cols=["canal","campana","producto","monto","cliente","vendedorEmail","whatsapp","fecha"];
-  const hdr=["Canal","Campaña","Producto","Monto","Cliente","Vendedor","WhatsApp","Fecha"].join(",");
-  const rows=ventas.map(v=>cols.map(c=>{
-    if(c==="fecha") return fmtDate(v.fecha);
-    return `"${(v[c]||"").toString().replace(/"/g,'""')}"`;
-  }).join(","));
-  const a=document.createElement("a");
-  a.href="data:text/csv;charset=utf-8,"+encodeURIComponent([hdr,...rows].join("\n"));
-  a.download=`ventas-${new Date().toISOString().slice(0,10)}.csv`;
+  const conWA = ventas.filter(v=>v.whatsapp&&v.whatsapp.replace(/[^0-9]/g,"").length>=10);
+  if(!conWA.length){ toast("Sin ventas con WhatsApp para exportar","error"); return; }
+  const rows = conWA.map(v=>{
+    let tel = (v.whatsapp||"").replace(/[^0-9]/g,"");
+    if(tel.length===10) tel = "52"+tel;
+    tel = "+"+tel;
+    const fecha = v.fecha&&v.fecha.toDate ? v.fecha.toDate() : new Date(v.fecha||Date.now());
+    const unixTs = Math.floor(fecha.getTime()/1000);
+    return ["Purchase",unixTs,(v.monto||0).toFixed(2),"MXN",tel].join(",");
+  });
+  const csv = ["event_name,event_time,value,currency,phone",...rows].join("
+");
+  const a = document.createElement("a");
+  a.href = "data:text/csv;charset=utf-8,"+encodeURIComponent(csv);
+  a.download = "meta-offline-"+new Date().toISOString().slice(0,10)+".csv";
   a.click();
+  toast(conWA.length+" eventos exportados para Meta","success");
+}
+
+// ─────────────────────────────────────────
+// MÉTRICAS PUBLICABLES — Admin publica, cliente ve
+// ─────────────────────────────────────────
+async function secMetricas(el){
+  const wsId = getWsId();
+  if(!wsId){ el.innerHTML=emptyWs(); return; }
+  el.innerHTML=`<div class="section-loading"><div class="spinner"></div></div>`;
+
+  // Cargar reportes de métricas publicados
+  let reportes=[];
+  try{
+    const snap=await getDocs(query(
+      collection(db,"workspaces",wsId,"metricas_reportes"),
+      orderBy("creadoEn","desc")
+    ));
+    reportes=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){}
+
+  // ── VISTA CLIENTE ──
+  if(!isAdmin()){
+    el.innerHTML=`
+    <div class="page-header">
+      <div><div class="page-title">Métricas de Campaña</div>
+      <div class="page-subtitle">Resultados publicados por tu agencia</div></div>
+    </div>
+    ${reportes.length===0
+      ? `<div class="empty-state">${ico("bar-chart")}<h3>Pendiente de publicar por la agencia</h3><p>Aquí verás tus métricas de campaña cuando estén listas.</p></div>`
+      : reportes.map(r=>`
+      <div class="card mb-4">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <div class="font-head font-800" style="font-size:15px">${r.nombre||"Reporte"}</div>
+            <div class="text-sm text-muted">${r.periodo||""} · Publicado ${fmtDate(r.creadoEn)}</div>
+          </div>
+          <span class="badge badge-primary">Publicado</span>
+        </div>
+        <div class="grid-2">
+          <div>
+            ${r.alcance?`<div class="stat-row"><span class="stat-key">👁 Alcance</span><span class="stat-val">${parseInt(r.alcance).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.impresiones?`<div class="stat-row"><span class="stat-key">📢 Impresiones</span><span class="stat-val">${parseInt(r.impresiones).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.interacciones?`<div class="stat-row"><span class="stat-key">❤️ Interacciones</span><span class="stat-val">${parseInt(r.interacciones).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.clics?`<div class="stat-row"><span class="stat-key">👆 Clics</span><span class="stat-val">${parseInt(r.clics).toLocaleString("es-MX")}</span></div>`:""}
+          </div>
+          <div>
+            ${r.leads?`<div class="stat-row"><span class="stat-key">🎣 Leads</span><span class="stat-val">${parseInt(r.leads).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.mensajes?`<div class="stat-row"><span class="stat-key">💬 Mensajes recibidos</span><span class="stat-val">${parseInt(r.mensajes).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.seguidoresNuevos?`<div class="stat-row"><span class="stat-key">➕ Seguidores nuevos</span><span class="stat-val">${parseInt(r.seguidoresNuevos).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.cpl?`<div class="stat-row"><span class="stat-key">💰 Costo por Lead</span><span class="stat-val">${fmtMXN(r.cpl)}</span></div>`:""}
+          </div>
+        </div>
+        ${r.observaciones?`<div style="margin-top:12px;background:var(--surface-el);border-radius:var(--r);padding:12px;border-left:3px solid var(--primary)">
+          <div class="text-sm text-muted mb-1">Observaciones de tu agencia</div>
+          <div style="font-size:13px">${r.observaciones}</div>
+        </div>`:""}
+      </div>`).join("")}`;
+    return;
+  }
+
+  // ── VISTA ADMIN ──
+  el.innerHTML=`
+  <div class="page-header">
+    <div><div class="page-title">Métricas de Campaña</div>
+    <div class="page-subtitle">Publica resultados para ${S.currentWorkspace?.name||""}</div></div>
+    <button class="btn btn-primary" id="btn-nueva-metrica">${ico("plus")} Nuevo reporte</button>
+  </div>
+
+  <div id="metricas-lista">
+    ${reportes.length===0
+      ? `<div class="empty-state">${ico("bar-chart")}<h3>Sin reportes publicados</h3><p>Crea el primero con el botón de arriba.</p></div>`
+      : reportes.map(r=>`
+      <div class="card mb-4">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <div class="font-head font-800">${r.nombre||"Reporte"}</div>
+            <div class="text-sm text-muted">${r.periodo||""} · ${fmtDate(r.creadoEn)}</div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn-icon" onclick="window._editMetrica('${r.id}')">${ico("edit")}</button>
+            <button class="btn-icon" onclick="window._delMetrica('${wsId}','${r.id}')">${ico("trash")}</button>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div>
+            ${r.alcance?`<div class="stat-row"><span class="stat-key">👁 Alcance</span><span class="stat-val">${parseInt(r.alcance).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.impresiones?`<div class="stat-row"><span class="stat-key">📢 Impresiones</span><span class="stat-val">${parseInt(r.impresiones).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.interacciones?`<div class="stat-row"><span class="stat-key">❤️ Interacciones</span><span class="stat-val">${parseInt(r.interacciones).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.clics?`<div class="stat-row"><span class="stat-key">👆 Clics</span><span class="stat-val">${parseInt(r.clics).toLocaleString("es-MX")}</span></div>`:""}
+          </div>
+          <div>
+            ${r.leads?`<div class="stat-row"><span class="stat-key">🎣 Leads</span><span class="stat-val">${parseInt(r.leads).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.mensajes?`<div class="stat-row"><span class="stat-key">💬 Mensajes</span><span class="stat-val">${parseInt(r.mensajes).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.seguidoresNuevos?`<div class="stat-row"><span class="stat-key">➕ Seguidores nuevos</span><span class="stat-val">${parseInt(r.seguidoresNuevos).toLocaleString("es-MX")}</span></div>`:""}
+            ${r.cpl?`<div class="stat-row"><span class="stat-key">💰 Costo por Lead</span><span class="stat-val">${fmtMXN(r.cpl)}</span></div>`:""}
+          </div>
+        </div>
+        ${r.observaciones?`<div style="margin-top:10px;background:var(--surface-el);padding:10px;border-radius:var(--r);font-size:13px">${r.observaciones}</div>`:""}
+      </div>`).join("")}
+  </div>`;
+
+  window._delMetrica=async(wid,rid)=>{
+    if(!confirm("¿Eliminar este reporte?")) return;
+    await deleteDoc(doc(db,"workspaces",wid,"metricas_reportes",rid));
+    toast("Eliminado","success"); secMetricas(el);
+  };
+
+  window._editMetrica=(rid)=>{
+    const r=reportes.find(x=>x.id===rid);
+    if(r) openModalMetrica(wsId, ()=>secMetricas(el), r);
+  };
+
+  document.getElementById("btn-nueva-metrica").addEventListener("click",()=>{
+    openModalMetrica(wsId, ()=>secMetricas(el), null);
+  });
+}
+
+function openModalMetrica(wsId, cb, metricaEditar=null){
+  const isEdit=!!metricaEditar;
+  const m=metricaEditar||{};
+  const ov=document.createElement("div"); ov.className="modal-overlay";
+  ov.innerHTML=`<div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">${isEdit?"Editar":"Nuevo"} reporte de métricas</div>
+      <button class="btn-icon" id="mm-close">${ico("x")}</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nombre del reporte</label>
+          <input class="form-input" id="mm-nombre" value="${m.nombre||""}" placeholder="ej. Campaña Julio 2025" /></div>
+        <div class="form-group"><label class="form-label">Periodo</label>
+          <input class="form-input" id="mm-periodo" value="${m.periodo||""}" placeholder="ej. 1 Jul – 31 Jul 2025" /></div>
+      </div>
+      <div class="section-title" style="margin-top:8px">Métricas de campaña</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">👁 Alcance</label>
+          <input class="form-input" id="mm-alcance" type="number" value="${m.alcance||""}" placeholder="0" /></div>
+        <div class="form-group"><label class="form-label">📢 Impresiones</label>
+          <input class="form-input" id="mm-impresiones" type="number" value="${m.impresiones||""}" placeholder="0" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">❤️ Interacciones</label>
+          <input class="form-input" id="mm-interacciones" type="number" value="${m.interacciones||""}" placeholder="0" /></div>
+        <div class="form-group"><label class="form-label">👆 Clics</label>
+          <input class="form-input" id="mm-clics" type="number" value="${m.clics||""}" placeholder="0" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">🎣 Leads generados</label>
+          <input class="form-input" id="mm-leads" type="number" value="${m.leads||""}" placeholder="0" /></div>
+        <div class="form-group"><label class="form-label">💬 Mensajes recibidos</label>
+          <input class="form-input" id="mm-mensajes" type="number" value="${m.mensajes||""}" placeholder="0" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">➕ Seguidores nuevos</label>
+          <input class="form-input" id="mm-seguidores" type="number" value="${m.seguidoresNuevos||""}" placeholder="0" /></div>
+        <div class="form-group"><label class="form-label">💰 Costo por Lead (MXN)</label>
+          <input class="form-input" id="mm-cpl" type="number" value="${m.cpl||""}" placeholder="0" /></div>
+      </div>
+      <div class="form-group"><label class="form-label">Observaciones para el cliente</label>
+        <textarea class="form-textarea" id="mm-obs" placeholder="Contexto, logros, notas del periodo…">${m.observaciones||""}</textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="mm-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="mm-save">${ico("check")} ${isEdit?"Actualizar":"Publicar al cliente"}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  document.getElementById("mm-close").onclick=close;
+  document.getElementById("mm-cancel").onclick=close;
+  ov.addEventListener("click",e=>{ if(e.target===ov) close(); });
+  document.getElementById("mm-save").onclick=async()=>{
+    const btn=document.getElementById("mm-save"); btn.disabled=true; btn.textContent="Publicando…";
+    const data={
+      nombre:document.getElementById("mm-nombre").value||"Reporte",
+      periodo:document.getElementById("mm-periodo").value||"",
+      alcance:parseInt(document.getElementById("mm-alcance").value||0)||0,
+      impresiones:parseInt(document.getElementById("mm-impresiones").value||0)||0,
+      interacciones:parseInt(document.getElementById("mm-interacciones").value||0)||0,
+      clics:parseInt(document.getElementById("mm-clics").value||0)||0,
+      leads:parseInt(document.getElementById("mm-leads").value||0)||0,
+      mensajes:parseInt(document.getElementById("mm-mensajes").value||0)||0,
+      seguidoresNuevos:parseInt(document.getElementById("mm-seguidores").value||0)||0,
+      cpl:parseFloat(document.getElementById("mm-cpl").value||0)||0,
+      observaciones:document.getElementById("mm-obs").value||"",
+      updatedAt:serverTimestamp()
+    };
+    try{
+      if(isEdit){
+        await updateDoc(doc(db,"workspaces",wsId,"metricas_reportes",metricaEditar.id),data);
+        toast("Reporte actualizado","success");
+      } else {
+        await addDoc(collection(db,"workspaces",wsId,"metricas_reportes"),{...data,creadoEn:serverTimestamp()});
+        toast("✅ Métricas publicadas al cliente","success");
+      }
+      close(); cb&&cb();
+    }catch(e){ toast("Error: "+e.message,"error"); btn.disabled=false; btn.textContent=isEdit?"Actualizar":"Publicar al cliente"; }
+  };
 }
 
 // ─────────────────────────────────────────
@@ -1598,21 +1958,23 @@ async function secROAS(el){
     if(!inv){ toast("Ingresa la inversión en Ads","error"); return; }
 
     const btn=document.getElementById("btn-calc-roas");
-    btn.disabled=true; btn.innerHTML=`<div class="spinner" style="width:14px;height:14px"></div>`;
+    btn.disabled=true; btn.innerHTML=`<div class="spinner" style="width:14px;height:14px"></div> Calculando…`;
 
-    // Sumar ventas del periodo desde Firestore
-    let ingresos=0;
+    // Sumar ventas registradas del periodo automáticamente
+    let ingresos=0, ventasContadas=0;
     try{
       const snap=await getDocs(query(collection(db,"workspaces",wsId,"ventas"),orderBy("fecha","desc")));
       const ventas=snap.docs.map(d=>d.data());
-      ingresos=ventas.filter(v=>{
+      const ventasFiltradas=ventas.filter(v=>{
         if(!desde&&!hasta) return true;
         const d=v.fecha?.toDate?.()||new Date(0);
         if(desde && d<new Date(desde)) return false;
         if(hasta && d>new Date(hasta+"T23:59:59")) return false;
         return true;
-      }).reduce((a,v)=>a+(v.monto||0),0);
-    }catch(e){ toast("Error cargando ventas","error"); }
+      });
+      ingresos=ventasFiltradas.reduce((a,v)=>a+(v.monto||0),0);
+      ventasContadas=ventasFiltradas.length;
+    }catch(e){ toast("Error cargando ventas: "+e.message,"error"); }
 
     const roas = inv>0 ? (ingresos/inv).toFixed(2) : "0.00";
     const roi  = inv>0 ? (((ingresos-inv)/inv)*100).toFixed(1) : "0.0";
@@ -1621,7 +1983,7 @@ async function secROAS(el){
     resultadoActual={
       nombre: document.getElementById("r-nombre").value||"Reporte",
       periodo: document.getElementById("r-periodo").value||`${desde||""}${desde&&hasta?" – ":""}${hasta||""}`,
-      inversion: inv, ingresos, roas, roi, leads,
+      inversion: inv, ingresos, roas, roi, leads, ventasContadas,
     };
 
     document.getElementById("roas-preview").innerHTML=`
@@ -1633,8 +1995,8 @@ async function secROAS(el){
       <div class="roas-number" style="color:${cls.color}">${roas}x</div>
       <div class="roas-label">ROAS · Retorno en Ads</div>
     </div>
-    <div class="stat-row"><span class="stat-key">Inversión</span><span class="stat-val">${fmtMXN(inv)}</span></div>
-    <div class="stat-row"><span class="stat-key">Ingresos (ventas registradas)</span><span class="stat-val text-success">${fmtMXN(ingresos)}</span></div>
+    <div class="stat-row"><span class="stat-key">Inversión en Ads</span><span class="stat-val">${fmtMXN(inv)}</span></div>
+    <div class="stat-row"><span class="stat-key">Ingresos (${ventasContadas} ventas registradas)</span><span class="stat-val text-success">${fmtMXN(ingresos)}</span></div>
     <div class="stat-row"><span class="stat-key">ROI</span><span class="stat-val" style="color:${cls.color}">${roi}%</span></div>
     ${leads?`<div class="stat-row"><span class="stat-key">Leads</span><span class="stat-val">${leads}</span></div>`:""}`;
 
@@ -1860,7 +2222,7 @@ async function secContenidos(el){
           <span style="font-size:13px;font-weight:600;min-width:120px;text-align:center">${mesLabel}</span>
           <button class="btn-icon" id="btn-mes-next" title="Mes siguiente">▶</button>
         </div>
-        ${isAdmin()?`<button class="btn btn-primary" id="btn-nueva-pieza">${ico("plus")} Agregar pieza</button>`:""}
+        ${isAdmin()?`<div class="flex gap-2"><button class="btn btn-secondary" id="btn-copiar-link">${ico("copy")} Enlace público</button><button class="btn btn-primary" id="btn-nueva-pieza">${ico("plus")} Agregar pieza</button></div>`:""}
       </div>
     </div>
 
@@ -1981,6 +2343,10 @@ async function secContenidos(el){
     document.getElementById("btn-mes-prev")?.addEventListener("click",()=>cargarYRenderizar(navMes(mes,-1)));
     document.getElementById("btn-mes-next")?.addEventListener("click",()=>cargarYRenderizar(navMes(mes,1)));
 
+    document.getElementById("btn-copiar-link")?.addEventListener("click",()=>{
+      const url=`${window.location.origin}${window.location.pathname}?parrilla=${wsId}`;
+      navigator.clipboard.writeText(url).then(()=>toast("✓ Enlace copiado — compártelo con tu cliente","success"));
+    });
     document.getElementById("btn-nueva-pieza")?.addEventListener("click",()=>{
       openModalPieza(wsId,mes,()=>cargarYRenderizar(mes),null,null);
     });
@@ -2148,6 +2514,203 @@ function openModalPieza(wsId, mes, cb, piezaEditar=null, fechaPreset=null){
   };
 }
 
+
+// ─────────────────────────────────────────
+// CRM DE PROSPECTOS
+// ─────────────────────────────────────────
+const ETAPAS = [
+  {id:"prospecto",   label:"Prospecto",   color:"#3b82f6"},
+  {id:"contactado",  label:"Contactado",  color:"#f59e0b"},
+  {id:"negociando",  label:"Negociando",  color:"#a855f7"},
+  {id:"ganado",      label:"Ganado",      color:"#22c55e"},
+];
+
+async function secProspectos(el){
+  const wsId=getWsId();
+  if(!wsId){ el.innerHTML=emptyWs(); return; }
+  el.innerHTML=`<div class="section-loading"><div class="spinner"></div></div>`;
+
+  let prospectos=[];
+  try{
+    const snap=await getDocs(query(collection(db,"workspaces",wsId,"prospectos"),orderBy("creadoEn","desc")));
+    prospectos=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){}
+
+  function renderBoard(){
+    const board=document.getElementById("kanban-board");
+    if(!board) return;
+    board.innerHTML=ETAPAS.map(etapa=>{
+      const cards=prospectos.filter(p=>p.etapa===etapa.id);
+      const total=cards.reduce((a,p)=>a+(p.monto||0),0);
+      return `<div class="kanban-col">
+        <div class="kanban-col-header">
+          <div class="flex items-center gap-2">
+            <div style="width:8px;height:8px;border-radius:50%;background:${etapa.color}"></div>
+            <span class="kanban-col-title">${etapa.label}</span>
+          </div>
+          <span class="kanban-col-count">${cards.length}</span>
+        </div>
+        ${total>0?`<div style="padding:6px 16px;font-size:11px;color:${etapa.color};font-weight:700;border-bottom:1px solid var(--border)">${fmtMXN(total)}</div>`:""}
+        <div class="kanban-col-body">
+          ${cards.map(p=>`
+          <div class="kanban-card" onclick="window._abrirProspecto('${p.id}')">
+            <div class="kanban-card-name">${p.nombre||"Sin nombre"}</div>
+            <div class="kanban-card-meta">${p.empresa||""} ${p.empresa&&p.canal?"·":""} ${p.canal||""}</div>
+            ${p.monto?`<div class="kanban-card-monto">${fmtMXN(p.monto)}</div>`:""}
+            ${p.notas?`<div style="font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.4">${p.notas.slice(0,60)}${p.notas.length>60?"…":""}</div>`:""}
+            <div class="flex gap-1 mt-2" onclick="event.stopPropagation()">
+              ${ETAPAS.filter(e=>e.id!==etapa.id).map(e=>`
+              <button class="btn btn-sm" style="font-size:10px;padding:3px 7px;background:${e.color}22;color:${e.color};border:1px solid ${e.color}44" onclick="window._moverProspecto('${p.id}','${e.id}')" title="Mover a ${e.label}">→ ${e.label}</button>`).join("")}
+            </div>
+          </div>`).join("")||`<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px">Sin prospectos</div>`}
+          <button class="btn btn-ghost btn-sm w-full" style="margin-top:4px" onclick="window._nuevoProspecto('${etapa.id}')">+ Agregar</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  el.innerHTML=`
+  <div class="page-header">
+    <div><div class="page-title">CRM de Prospectos</div>
+    <div class="page-subtitle">${prospectos.length} prospectos · ${fmtMXN(prospectos.filter(p=>p.etapa==="ganado").reduce((a,p)=>a+(p.monto||0),0))} ganados</div></div>
+    <button class="btn btn-primary" onclick="window._nuevoProspecto('prospecto')">${ico("plus")} Nuevo prospecto</button>
+  </div>
+  <div class="kanban-board" id="kanban-board"></div>`;
+
+  renderBoard();
+
+  window._moverProspecto=async(pid,etapa)=>{
+    const p=prospectos.find(x=>x.id===pid);
+    if(!p) return;
+    // Si se mueve a "ganado", preguntar si convertir a venta
+    if(etapa==="ganado"){
+      await updateDoc(doc(db,"workspaces",wsId,"prospectos",pid),{etapa,updatedAt:serverTimestamp()});
+      p.etapa=etapa;
+      renderBoard();
+      // Preguntar si crear venta
+      if(confirm(`¿Convertir a "${p.nombre}" en una venta registrada?`)){
+        try{
+          await addDoc(collection(db,"workspaces",wsId,"ventas"),{
+            canal: p.canal||"otro",
+            producto: p.servicio||"Prospecto convertido",
+            monto: p.monto||0,
+            cliente: p.nombre||"",
+            whatsapp: p.whatsapp||"",
+            notas: `Convertido desde CRM. ${p.notas||""}`,
+            fecha: Timestamp.fromDate(new Date()),
+            vendedorId: S.user.uid,
+            vendedorEmail: S.user.email,
+            creadoEn: serverTimestamp(),
+          });
+          toast("🎉 ¡Venta registrada automáticamente!","success");
+          lanzarConfeti();
+        }catch(e){ toast("Error al crear venta: "+e.message,"error"); }
+      }
+    } else {
+      await updateDoc(doc(db,"workspaces",wsId,"prospectos",pid),{etapa,updatedAt:serverTimestamp()});
+      p.etapa=etapa; renderBoard();
+    }
+  };
+
+  window._abrirProspecto=(pid)=>{
+    const p=prospectos.find(x=>x.id===pid);
+    if(p) openModalProspecto(wsId,p,()=>secProspectos(el));
+  };
+
+  window._nuevoProspecto=(etapa)=>{
+    openModalProspecto(wsId,{etapa},()=>secProspectos(el));
+  };
+}
+
+function openModalProspecto(wsId, prospecto={}, cb){
+  const isEdit=!!prospecto.id;
+  const ov=document.createElement("div"); ov.className="modal-overlay";
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">${isEdit?"Editar":"Nuevo"} Prospecto</div>
+      <button class="btn-icon" id="mp-close">${ico("x")}</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nombre <span class="req">*</span></label>
+          <input class="form-input" id="mp-nombre" value="${prospecto.nombre||""}" placeholder="Juan Pérez" /></div>
+        <div class="form-group"><label class="form-label">Empresa</label>
+          <input class="form-input" id="mp-empresa" value="${prospecto.empresa||""}" placeholder="Empresa del prospecto" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">WhatsApp</label>
+          <input class="form-input" id="mp-wa" value="${prospecto.whatsapp||""}" placeholder="+52 55 0000 0000" /></div>
+        <div class="form-group"><label class="form-label">Canal de origen</label>
+          <select class="form-select" id="mp-canal">
+            <option value="">Selecciona</option>
+            <option value="facebook" ${prospecto.canal==="facebook"?"selected":""}>Facebook</option>
+            <option value="instagram" ${prospecto.canal==="instagram"?"selected":""}>Instagram</option>
+            <option value="tiktok" ${prospecto.canal==="tiktok"?"selected":""}>TikTok</option>
+            <option value="google" ${prospecto.canal==="google"?"selected":""}>Google</option>
+            <option value="referido" ${prospecto.canal==="referido"?"selected":""}>Referido</option>
+            <option value="otro" ${prospecto.canal==="otro"?"selected":""}>Otro</option>
+          </select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Servicio de interés</label>
+          <input class="form-input" id="mp-servicio" value="${prospecto.servicio||""}" placeholder="ej. Consultoría mensual" /></div>
+        <div class="form-group"><label class="form-label">Monto potencial (MXN)</label>
+          <input class="form-input" id="mp-monto" type="number" value="${prospecto.monto||""}" placeholder="0" /></div>
+      </div>
+      <div class="form-group"><label class="form-label">Etapa</label>
+        <select class="form-select" id="mp-etapa">
+          ${ETAPAS.map(e=>`<option value="${e.id}" ${prospecto.etapa===e.id?"selected":""}>${e.label}</option>`).join("")}
+        </select></div>
+      <div class="form-group"><label class="form-label">Notas</label>
+        <textarea class="form-textarea" id="mp-notas" placeholder="Contexto del prospecto, necesidades, seguimiento…">${prospecto.notas||""}</textarea></div>
+    </div>
+    <div class="modal-footer">
+      ${isEdit?`<button class="btn btn-danger btn-sm" id="mp-del">Eliminar</button>`:""}
+      <button class="btn btn-ghost" id="mp-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="mp-save">${ico("check")} ${isEdit?"Actualizar":"Crear"}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  document.getElementById("mp-close").onclick=close;
+  document.getElementById("mp-cancel").onclick=close;
+  ov.addEventListener("click",e=>{ if(e.target===ov) close(); });
+
+  if(isEdit){
+    document.getElementById("mp-del").onclick=async()=>{
+      if(!confirm("¿Eliminar este prospecto?")) return;
+      await deleteDoc(doc(db,"workspaces",wsId,"prospectos",prospecto.id));
+      toast("Eliminado","success"); close(); cb&&cb();
+    };
+  }
+
+  document.getElementById("mp-save").onclick=async()=>{
+    const nombre=document.getElementById("mp-nombre").value.trim();
+    if(!nombre){ toast("El nombre es requerido","error"); return; }
+    const btn=document.getElementById("mp-save"); btn.disabled=true; btn.textContent="Guardando…";
+    const data={
+      nombre,
+      empresa: document.getElementById("mp-empresa").value,
+      whatsapp: document.getElementById("mp-wa").value,
+      canal: document.getElementById("mp-canal").value,
+      servicio: document.getElementById("mp-servicio").value,
+      monto: parseFloat(document.getElementById("mp-monto").value||0)||0,
+      etapa: document.getElementById("mp-etapa").value,
+      notas: document.getElementById("mp-notas").value,
+      updatedAt: serverTimestamp(),
+    };
+    try{
+      if(isEdit){
+        await updateDoc(doc(db,"workspaces",wsId,"prospectos",prospecto.id),data);
+        toast("Actualizado","success");
+      } else {
+        await addDoc(collection(db,"workspaces",wsId,"prospectos"),{...data,creadoEn:serverTimestamp()});
+        toast("Prospecto creado","success");
+      }
+      close(); cb&&cb();
+    }catch(e){ toast("Error: "+e.message,"error"); btn.disabled=false; btn.textContent=isEdit?"Actualizar":"Crear"; }
+  };
+}
 
 // ─────────────────────────────────────────
 // WORKSPACES
@@ -2394,6 +2957,79 @@ async function secConfiguracion(el){
 // ─────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────
+function imprimirDashboard(nombre){
+  const dashContent = document.getElementById("dash-content");
+  if(!dashContent){ toast("Sin contenido para imprimir","error"); return; }
+
+  const fecha = new Date().toLocaleDateString("es-MX",{day:"2-digit",month:"long",year:"numeric"});
+  const printWin = window.open("","_blank","width=900,height=700");
+  printWin.document.write(`<!DOCTYPE html><html lang="es"><head>
+    <meta charset="UTF-8"/>
+    <title>Reporte · ${nombre}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:"DM Sans",sans-serif;font-size:13px;color:#1a1a1a;background:#fff;padding:32px}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:20px;border-bottom:3px solid #e8ff47}
+      .brand{font-family:"Syne",sans-serif;font-size:22px;font-weight:800;color:#0d0d0d;letter-spacing:-0.5px}
+      .brand-sub{font-size:11px;color:#666;letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+      .report-info{text-align:right}
+      .report-title{font-family:"Syne",sans-serif;font-size:16px;font-weight:700}
+      .report-date{font-size:11px;color:#666;margin-top:2px}
+      .metric-card{background:#f8f8f8;border-radius:8px;padding:16px;position:relative;overflow:hidden}
+      .metric-card::before{content:"";position:absolute;left:0;top:0;height:100%;width:3px;background:#e8ff47;border-radius:2px 0 0 2px}
+      .metric-label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#888;margin-bottom:6px}
+      .metric-value{font-family:"Syne",sans-serif;font-size:22px;font-weight:800;color:#0d0d0d;line-height:1}
+      .metric-value.hi{color:#1a1a1a}
+      .metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+      .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+      .card{background:#f8f8f8;border-radius:10px;padding:16px}
+      .section-title{font-family:"Syne",sans-serif;font-size:12px;font-weight:700;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #e5e5e5;text-transform:uppercase;letter-spacing:0.5px}
+      .stat-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #e5e5e5}
+      .stat-row:last-child{border-bottom:none}
+      .stat-key{font-size:12px;color:#666}
+      .stat-val{font-size:12px;font-weight:700;color:#0d0d0d}
+      table{width:100%;border-collapse:collapse;font-size:12px}
+      th{font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#888;text-align:left;padding:8px 10px;border-bottom:2px solid #e5e5e5}
+      td{padding:8px 10px;border-bottom:1px solid #e5e5e5;color:#333}
+      .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:700}
+      .roas-box{background:#0d0d0d;border-radius:10px;padding:20px;text-align:center;color:#fff}
+      .roas-num{font-family:"Syne",sans-serif;font-size:40px;font-weight:800;color:#e8ff47;line-height:1}
+      .roas-label{font-size:11px;color:#888;margin-top:4px;letter-spacing:1px;text-transform:uppercase}
+      svg text{fill:#333}
+      .progress-bar-wrap{background:#e5e5e5;border-radius:4px;height:6px;overflow:hidden;margin-top:6px}
+      .progress-bar-fill{height:100%;background:#e8ff47;border-radius:4px}
+      .footer{margin-top:32px;padding-top:16px;border-top:1px solid #e5e5e5;display:flex;justify-content:space-between;font-size:10px;color:#999}
+      @media print{body{padding:20px}button{display:none!important}}
+    </style>
+  </head><body>
+    <div class="header">
+      <div>
+        <div class="brand">BRAVO CRM</div>
+        <div class="brand-sub">Resultados que se ven</div>
+      </div>
+      <div class="report-info">
+        <div class="report-title">${nombre}</div>
+        <div class="report-date">Generado el ${fecha}</div>
+      </div>
+    </div>
+    ${dashContent.innerHTML}
+    <div class="footer">
+      <span>Generado por Bravo Agency · bravo-crm</span>
+      <span>${fecha}</span>
+    </div>
+    <script>
+      // Limpiar elementos no necesarios para impresión
+      document.querySelectorAll("button,.btn,.btn-icon,#btn-pdf-dash").forEach(b=>b.remove());
+      // Adaptar colores para impresión
+      document.querySelectorAll("[style*='background:var(--surface']").forEach(el=>{el.style.background="#f8f8f8"});
+      document.querySelectorAll("[style*='color:var(--text-muted']").forEach(el=>{el.style.color="#888"});
+      setTimeout(()=>window.print(),800);
+    <\/script>
+  </body></html>`);
+  printWin.document.close();
+}
+
 function emptyWs(){
   return `<div class="empty-state">${ico("briefcase")}<h3>Sin workspace activo</h3><p>Selecciona un workspace desde el menú superior.</p></div>`;
 }
@@ -2401,7 +3037,206 @@ function emptyWs(){
 // ─────────────────────────────────────────
 // AUTH LISTENER — ARRANQUE
 // ─────────────────────────────────────────
+// ─────────────────────────────────────────
+// PARRILLA PÚBLICA (sin login)
+// ─────────────────────────────────────────
+async function checkParrillaPublica(){
+  const params = new URLSearchParams(window.location.search);
+  const wsId = params.get("parrilla");
+  if(!wsId) return false;
+
+  // Modo parrilla pública — sin auth
+  document.getElementById("loading-screen").style.display="none";
+  const app = document.getElementById("app");
+
+  const now = new Date();
+  let mesActual = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+
+  function getMesLabel(mes){
+    const [y,m]=mes.split("-").map(Number);
+    return new Date(y,m-1,1).toLocaleDateString("es-MX",{month:"long",year:"numeric"});
+  }
+  function navMes(mes,delta){
+    const [y,m]=mes.split("-").map(Number);
+    const d=new Date(y,m-1+delta,1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  }
+
+  // Cargar nombre del workspace
+  let wsName="";
+  try{
+    const wsDoc=await getDoc(doc(db,"workspaces",wsId));
+    if(wsDoc.exists()) wsName=wsDoc.data().name||"";
+  }catch(e){}
+
+  async function renderParrillaPublica(mes){
+    app.innerHTML=`<div style="min-height:100vh;background:var(--bg)">
+      <!-- Header público -->
+      <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div class="logo-text" style="font-size:20px">BRAVO CRM</div>
+          <div class="text-sm text-muted">Parrilla de contenidos · ${wsName}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn-icon" id="pub-prev">◀</button>
+          <span style="font-size:13px;font-weight:600;min-width:130px;text-align:center" id="pub-mes-label">${getMesLabel(mes).charAt(0).toUpperCase()+getMesLabel(mes).slice(1)}</span>
+          <button class="btn-icon" id="pub-next">▶</button>
+        </div>
+      </div>
+      <div style="padding:24px" id="pub-content">
+        <div class="section-loading"><div class="spinner"></div></div>
+      </div>
+    </div>`;
+
+    document.getElementById("pub-prev").onclick=()=>renderParrillaPublica(navMes(mes,-1));
+    document.getElementById("pub-next").onclick=()=>renderParrillaPublica(navMes(mes,1));
+
+    // Cargar piezas
+    let piezas=[];
+    try{
+      const snap=await getDocs(query(
+        collection(db,"workspaces",wsId,"contenidos"),
+        where("mes","==",mes)
+      ));
+      piezas=snap.docs.map(d=>({id:d.id,...d.data(),wsId}));
+      piezas.sort((a,b)=>{
+        const da=new Date((a.fecha||"2000-01-01")+"T"+(a.hora||"00:00"));
+        const db2=new Date((b.fecha||"2000-01-01")+"T"+(b.hora||"00:00"));
+        return da-db2;
+      });
+    }catch(e){}
+
+    const porFecha={};
+    piezas.forEach(p=>{ const k=p.fecha||"Sin fecha"; if(!porFecha[k]) porFecha[k]=[]; porFecha[k].push(p); });
+
+    const totalAprobados=piezas.filter(p=>p.status==="aprobado").length;
+    const totalPendientes=piezas.filter(p=>p.status==="pendiente"||p.status==="revision").length;
+    const totalComentarios=piezas.filter(p=>p.comentarioCliente).length;
+
+    const pubContent=document.getElementById("pub-content");
+    if(!pubContent) return;
+
+    if(piezas.length===0){
+      pubContent.innerHTML=`<div class="empty-state">${ico("calendar")}<h3>Sin contenidos este mes</h3><p>La programación aparecerá aquí cuando esté lista.</p></div>`;
+      return;
+    }
+
+    pubContent.innerHTML=`
+    <div class="metrics-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px">
+      <div class="metric-card"><div class="metric-label">Total piezas</div><div class="metric-value">${piezas.length}</div></div>
+      <div class="metric-card"><div class="metric-label">Aprobadas</div><div class="metric-value" style="color:var(--success)">${totalAprobados}</div></div>
+      <div class="metric-card"><div class="metric-label">Pendientes</div><div class="metric-value" style="color:var(--warning)">${totalPendientes}</div></div>
+    </div>
+    ${Object.entries(porFecha).map(([fecha,pzs])=>{
+      const fechaLabel=fecha!=="Sin fecha"
+        ? new Date(fecha+"T12:00:00").toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"})
+        : "Sin fecha";
+      return `<div style="margin-bottom:32px">
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:16px">${fechaLabel}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+          ${pzs.map(p=>`
+          <div class="card" style="padding:0;overflow:hidden;cursor:pointer;border-color:${p.status==="aprobado"?"var(--success)":p.status==="rechazado"?"var(--error)":"var(--border)"}" onclick="window._pubAbrirPieza('${p.id}')">
+            <div style="position:relative">
+              ${renderThumbnail(p)}
+              <div style="position:absolute;top:8px;left:8px">${formatoBadge(p.tipo)}</div>
+              <div style="position:absolute;top:8px;right:8px">${redIcon(p.red)}</div>
+            </div>
+            <div style="padding:12px">
+              ${p.hora?`<div class="text-sm text-muted" style="margin-bottom:4px">${p.hora}</div>`:""}
+              <div style="font-weight:700;font-size:13px;line-height:1.3;margin-bottom:6px">${p.titulo||p.descripcion||"Sin título"}</div>
+              <div style="margin-top:4px">${redIcon(p.red,true)}</div>
+              <div style="margin-top:8px;font-size:11px;font-weight:700;color:${statusColor(p.status)}">${statusLabel(p.status)}</div>
+              ${p.comentarioCliente?`<div style="margin-top:6px;font-size:11px;color:var(--warning);background:var(--surface-el);border-radius:4px;padding:4px 8px">💬 ${p.comentarioCliente.slice(0,50)}</div>`:""}
+            </div>
+          </div>`).join("")}
+        </div>
+      </div>`;
+    }).join("")}`;
+
+    // Guardar piezas para viewer
+    window._pubPiezas=piezas;
+    window._pubAbrirPieza=(pid)=>{
+      const p=window._pubPiezas.find(x=>x.id===pid);
+      if(p) openViewerPublico(p);
+    };
+  }
+
+  await renderParrillaPublica(mesActual);
+  return true;
+}
+
+function openViewerPublico(p){
+  // Viewer público con opción de aprobar/comentar (guarda en Firestore)
+  const isVideo=p.mediaType==="video";
+  const ratio=p.tipo==="Story"||p.tipo==="Reel"?"9/16":"4/5";
+  const allMedia=(p.mediaUrls&&p.mediaUrls.length>1)?p.mediaUrls:(p.mediaUrl?[{url:p.mediaUrl,type:p.mediaType}]:[]);
+
+  const ov=document.createElement("div"); ov.className="modal-overlay"; ov.style.zIndex="9999";
+  ov.innerHTML=`<div style="background:var(--surface);border-radius:var(--r-lg);max-width:420px;width:100%;max-height:92vh;overflow-y:auto;border:1px solid var(--border)">
+    <div class="modal-header">
+      <div>
+        <div style="display:flex;gap:8px;margin-bottom:4px">${formatoBadge(p.tipo)} ${redIcon(p.red,true)}</div>
+        <div class="font-head font-800" style="font-size:15px">${p.titulo||p.descripcion||""}</div>
+        <div class="text-sm text-muted">${p.fecha||""} ${p.hora?"· "+p.hora:""}</div>
+      </div>
+      <button class="btn-icon" id="vpub-close">${ico("x")}</button>
+    </div>
+    <div style="padding:0 16px">
+      ${allMedia.length===0
+        ? p.tipo==="Pendiente"
+          ? `<div style="width:100%;aspect-ratio:${ratio};background:#f59e0b11;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--warning);gap:8px"><div style="font-size:32px">📋</div><div style="font-weight:700">Contenido pendiente</div></div>`
+          : `<div style="width:100%;aspect-ratio:${ratio};background:var(--surface-el);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-muted)">Sin archivo</div>`
+        : allMedia.length===1
+          ? allMedia[0].type==="video"
+            ? `<video src="${allMedia[0].url}" style="width:100%;aspect-ratio:${ratio};object-fit:cover;border-radius:8px" controls></video>`
+            : `<img src="${allMedia[0].url}" style="width:100%;aspect-ratio:${ratio};object-fit:cover;border-radius:8px" />`
+          : `<div style="position:relative;overflow:hidden;border-radius:8px" id="pub-car">
+              <div id="pub-car-track" style="display:flex;transition:transform .3s ease">
+                ${allMedia.map(m=>m.type==="video"
+                  ? `<div style="flex:0 0 100%"><video src="${m.url}" style="width:100%;aspect-ratio:${ratio};object-fit:cover" controls></video></div>`
+                  : `<div style="flex:0 0 100%"><img src="${m.url}" style="width:100%;aspect-ratio:${ratio};object-fit:cover" /></div>`).join("")}
+              </div>
+              <button onclick="(function(){var t=document.getElementById('pub-car-track');var i=Math.max(0,(parseInt(t.dataset.idx||0)-1));t.dataset.idx=i;t.style.transform='translateX(-'+i*100+'%)'})()" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:#000a;border:none;color:#fff;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:16px">‹</button>
+              <button onclick="(function(){var t=document.getElementById('pub-car-track');var i=Math.min(${allMedia.length-1},(parseInt(t.dataset.idx||0)+1));t.dataset.idx=i;t.style.transform='translateX(-'+i*100+'%)'})()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#000a;border:none;color:#fff;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:16px">›</button>
+            </div>`}
+    </div>
+    <div style="padding:16px">
+      ${p.descripcion?`<div class="stat-row"><span class="stat-key">Descripción</span><span class="stat-val">${p.descripcion}</span></div>`:""}
+      ${p.copy?`<div style="margin-top:12px"><div class="form-label mb-2">Copy</div><div style="background:var(--surface-el);border-radius:var(--r);padding:12px;font-size:13px;line-height:1.6">${p.copy}</div></div>`:""}
+      <div style="margin-top:16px">
+        <div class="form-label" style="margin-bottom:6px">Tu comentario</div>
+        <textarea class="form-textarea" id="vpub-comentario" placeholder="Escribe tu aprobación o solicitud de cambio…" style="min-height:70px">${p.comentarioCliente||""}</textarea>
+        <div class="flex gap-2 mt-2">
+          <button class="btn btn-primary" style="flex:1" id="vpub-aprobar">✓ Aprobar</button>
+          <button class="btn btn-danger btn-sm" id="vpub-rechazar">✕ Solicitar cambio</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  document.getElementById("vpub-close").onclick=close;
+  ov.addEventListener("click",e=>{ if(e.target===ov) close(); });
+
+  async function accion(status){
+    const comentario=document.getElementById("vpub-comentario").value;
+    try{
+      await updateDoc(doc(db,"workspaces",p.wsId,"contenidos",p.id),{
+        status, comentarioCliente:comentario, revisadoEn:serverTimestamp()
+      });
+      toast(status==="aprobado"?"✓ Pieza aprobada":"Cambio solicitado","success");
+      close();
+      // Refrescar
+      window._pubPiezas=window._pubPiezas.map(x=>x.id===p.id?{...x,status,comentarioCliente:comentario}:x);
+    }catch(e){ toast("Error al guardar","error"); }
+  }
+  document.getElementById("vpub-aprobar").onclick=()=>accion("aprobado");
+  document.getElementById("vpub-rechazar").onclick=()=>accion("rechazado");
+}
+
 onAuthStateChanged(auth, async user=>{
+  // Verificar si es parrilla pública
+  if(await checkParrillaPublica()) return;
   if(!user){ S.user=null; S.profile=null; hideLoading(); render(); return; }
   S.user=user;
   try{
