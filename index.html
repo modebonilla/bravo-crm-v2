@@ -287,6 +287,36 @@ tr:hover td{background:var(--surface-el);color:var(--text)}
     <p style="color:var(--text-muted);font-size:13px;margin-top:8px">Iniciando Bravo CRM…</p>
   </div>
 </div>
+<script>
+// Si Firebase no responde en 4 segundos, cerrar sesión y mostrar login
+window._initTimeout = setTimeout(()=>{
+  if(document.getElementById("loading-screen")?.style.display !== "none"){
+    // Forzar logout y mostrar login
+    document.getElementById("loading-screen").style.display="none";
+    document.getElementById("app").innerHTML=`
+      <div class="login-page">
+        <div class="login-card">
+          <div class="login-brand">
+            <div class="logo">BRAVO CRM</div>
+            <div class="tagline">Resultados que se ven</div>
+          </div>
+          <div style="background:#ef444420;border:1px solid #ef4444;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#ef4444;text-align:center">
+            Sesión expirada. Ingresa de nuevo.
+          </div>
+          <div class="login-title">Bienvenido</div>
+          <div class="login-sub">Ingresa con tu cuenta</div>
+          <div class="flex flex-col gap-4">
+            <div class="form-group"><label class="form-label">Correo</label><input class="form-input" id="l-email" type="email" placeholder="hola@bravo.mx" /></div>
+            <div class="form-group"><label class="form-label">Contraseña</label><input class="form-input" id="l-pass" type="password" placeholder="••••••••" /></div>
+            <button class="btn btn-primary btn-lg" onclick="window.location.reload()">Recargar e intentar</button>
+          </div>
+        </div>
+      </div>`;
+    // Intentar cerrar sesión en Firebase si ya cargó
+    try{ if(window._fbAuth) window._fbAuth.signOut(); }catch(e){}
+  }
+}, 4000);
+</script>
 <div id="toast-container"></div>
 
 <script type="module">
@@ -316,6 +346,7 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const auth  = getAuth(fbApp);
+window._fbAuth = auth;
 const db    = getFirestore(fbApp);
 
 // ─────────────────────────────────────────
@@ -3210,6 +3241,7 @@ function openViewerPublico(p){
 }
 
 onAuthStateChanged(auth, async user=>{
+  if(window._initTimeout) clearTimeout(window._initTimeout);
   // Verificar si es parrilla pública
   if(await checkParrillaPublica()) return;
   if(!user){ S.user=null; S.profile=null; hideLoading(); render(); return; }
@@ -3225,14 +3257,21 @@ onAuthStateChanged(auth, async user=>{
         <p style="color:var(--text-muted);font-size:12px">Un momento por favor</p>
       </div>
     </div>`;
-  // Si tarda más de 8 segundos, forzar render con lo que hay
-  setTimeout(()=>{
+  // Si tarda más de 5 segundos, forzar render con lo que hay
+  const _cargaTimeout = setTimeout(()=>{
     if(document.getElementById("carga-screen")){
       hideLoading();
-      if(S.user && !S.profile) S.profile={id:S.user.uid,email:S.user.email,role:"cliente"};
-      if(S.user) render();
+      if(S.user){
+        if(!S.profile) S.profile={id:S.user.uid,email:S.user.email,role:"cliente"};
+        if(!S.section) S.section = S.profile.role==="admin"?"panel-agencia":"dashboard";
+        render();
+      } else {
+        // Sin usuario, mostrar login
+        render();
+      }
     }
-  }, 8000);
+  }, 5000);
+  window._cargaTimeout = _cargaTimeout;
 
   try{
     // Perfil y config en paralelo
@@ -3268,6 +3307,7 @@ onAuthStateChanged(auth, async user=>{
     if(!S.profile) S.profile={id:user.uid,email:user.email,role:"cliente"};
   }
 
+  if(window._cargaTimeout) clearTimeout(window._cargaTimeout);
   hideLoading();
   render();
   if(isAdmin()) setTimeout(cargarNotifContenidos, 2000);
