@@ -618,150 +618,226 @@ async function renderSection(sec){
 }
 
 // ─────────────────────────────────────────
+// HELPERS DE GRÁFICAS (SVG nativo, sin dependencias)
+// ─────────────────────────────────────────
+function graficaBarras(datos, titulo=""){
+  // datos = [{label, valor, color}]
+  if(!datos.length||datos.every(d=>d.valor===0)) return `<div class="empty-state" style="padding:24px"><h3>Sin datos para graficar</h3></div>`;
+  const max=Math.max(...datos.map(d=>d.valor))||1;
+  const w=300, h=160, pad=40, barW=Math.min(40, (w-pad*2)/datos.length - 8);
+  const svgBars = datos.map((d,i)=>{
+    const bh=Math.round(((d.valor/max)*(h-pad)));
+    const x=pad+(i*(w-pad*2)/datos.length)+((w-pad*2)/datos.length-barW)/2;
+    const y=h-pad-bh;
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${d.color||"#e8ff47"}" rx="3"/>
+      <text x="${x+barW/2}" y="${h-pad+14}" text-anchor="middle" fill="#606060" font-size="10" font-family="DM Sans,sans-serif">${d.label}</text>
+      <text x="${x+barW/2}" y="${y-4}" text-anchor="middle" fill="#f5f5f5" font-size="9" font-family="DM Sans,sans-serif">${fmtMXN(d.valor).replace("$","$")}</text>`;
+  }).join("");
+  return `<div style="overflow-x:auto"><svg viewBox="0 0 ${w} ${h}" style="width:100%;max-width:${w}px;display:block;margin:0 auto">
+    <line x1="${pad}" y1="${pad/2}" x2="${pad}" y2="${h-pad}" stroke="#2a2a2a" stroke-width="1"/>
+    <line x1="${pad}" y1="${h-pad}" x2="${w-pad/2}" y2="${h-pad}" stroke="#2a2a2a" stroke-width="1"/>
+    ${svgBars}
+  </svg></div>`;
+}
+
+function graficaPastel(datos, titulo=""){
+  if(!datos.length||datos.every(d=>d.valor===0)) return `<div class="empty-state" style="padding:24px"><h3>Sin datos</h3></div>`;
+  const total=datos.reduce((a,d)=>a+d.valor,0)||1;
+  const cx=80,cy=80,r=65;
+  let angle=-Math.PI/2;
+  const slices=datos.map(d=>{
+    const sweep=(d.valor/total)*2*Math.PI;
+    const x1=cx+r*Math.cos(angle), y1=cy+r*Math.sin(angle);
+    angle+=sweep;
+    const x2=cx+r*Math.cos(angle), y2=cy+r*Math.sin(angle);
+    const large=sweep>Math.PI?1:0;
+    return {path:`M${cx},${cy} L${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} Z`,color:d.color,label:d.label,pct:Math.round((d.valor/total)*100)};
+  }).filter(s=>!isNaN(parseFloat(s.path.split("L")[1])));
+  const leyenda=datos.map(d=>`<div class="flex items-center gap-2 text-sm"><div style="width:10px;height:10px;border-radius:2px;background:${d.color};flex-shrink:0"></div><span class="text-muted">${d.label}</span><span class="font-bold" style="margin-left:auto">${Math.round((d.valor/total)*100)}%</span></div>`).join("");
+  return `<div class="flex gap-4 items-center flex-wrap">
+    <svg viewBox="0 0 160 160" style="width:130px;flex-shrink:0">
+      ${slices.map(s=>`<path d="${s.path}" fill="${s.color}" stroke="#161616" stroke-width="1.5"/>`).join("")}
+    </svg>
+    <div class="flex flex-col gap-2" style="flex:1;min-width:120px">${leyenda}</div>
+  </div>`;
+}
+
+function graficaLinea(puntos, titulo=""){
+  // puntos = [{label, valor}]
+  if(!puntos.length||puntos.every(p=>p.valor===0)) return `<div class="empty-state" style="padding:16px"><h3>Sin datos</h3></div>`;
+  const max=Math.max(...puntos.map(p=>p.valor))||1;
+  const w=300,h=120,padX=40,padY=20;
+  const pts=puntos.map((p,i)=>({
+    x:padX+i*((w-padX*2)/(puntos.length-1||1)),
+    y:padY+(1-p.valor/max)*(h-padY*2),
+    label:p.label,valor:p.valor
+  }));
+  const polyline=pts.map(p=>`${p.x},${p.y}`).join(" ");
+  const area=`${pts[0].x},${h-padY} `+pts.map(p=>`${p.x},${p.y}`).join(" ")+` ${pts[pts.length-1].x},${h-padY}`;
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;display:block">
+    <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e8ff47" stop-opacity=".3"/><stop offset="100%" stop-color="#e8ff47" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="${area}" fill="url(#lg)"/>
+    <polyline points="${polyline}" fill="none" stroke="#e8ff47" stroke-width="2" stroke-linejoin="round"/>
+    ${pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3" fill="#e8ff47"/>
+      <text x="${p.x}" y="${h-4}" text-anchor="middle" fill="#606060" font-size="9" font-family="DM Sans,sans-serif">${p.label}</text>`).join("")}
+  </svg>`;
+}
+
+const CANALES_COLORS={facebook:"#1877f2",instagram:"#e1306c",tiktok:"#00f2ea",google:"#ea4335",referido:"#a0a0a0",otro:"#606060"};
+const CANALES_LIST=["facebook","instagram","tiktok","google","referido","otro"];
+
+function calcMetricas(ventas){
+  const total=ventas.reduce((a,v)=>a+(v.monto||0),0);
+  const ticket=ventas.length?total/ventas.length:0;
+  const porCanal={};
+  CANALES_LIST.forEach(c=>{ porCanal[c]=ventas.filter(v=>(v.canal||"").toLowerCase()===c).reduce((a,v)=>a+(v.monto||0),0); });
+  // Por mes (últimos 6)
+  const now=new Date();
+  const porMes=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const mesKey=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+    const label=d.toLocaleDateString("es-MX",{month:"short"});
+    const val=ventas.filter(v=>{
+      if(!v.fecha) return false;
+      const vd=v.fecha.toDate?v.fecha.toDate():new Date(v.fecha);
+      return `${vd.getFullYear()}-${String(vd.getMonth()+1).padStart(2,"0")}`===mesKey;
+    }).reduce((a,v)=>a+(v.monto||0),0);
+    porMes.push({label,valor:val});
+  }
+  return {total,ticket,porCanal,porMes};
+}
+
+// ─────────────────────────────────────────
 // PANEL DE AGENCIA (admin, vista global)
 // ─────────────────────────────────────────
 async function secPanelAgencia(el){
   if(!isAdmin()){ el.innerHTML=`<div class="empty-state"><h3>Acceso restringido</h3></div>`; return; }
+  el.innerHTML=`<div class="section-loading"><div class="spinner"></div></div>`;
 
-  // Cargar todas las ventas de todos los workspaces
-  let todasVentas = [];
-  let wsConVentas = [];
+  let todasVentas=[], wsConVentas=[];
   for(const ws of S.workspaces){
-    const snap = await getDocs(query(collection(db,"workspaces",ws.id,"ventas"),orderBy("fecha","desc")));
-    const ventas = snap.docs.map(d=>({id:d.id,...d.data(),wsId:ws.id,wsName:ws.name}));
-    todasVentas = [...todasVentas, ...ventas];
-    wsConVentas.push({ ...ws, ventas, total: ventas.reduce((a,v)=>a+(v.monto||0),0) });
+    try{
+      const snap=await getDocs(query(collection(db,"workspaces",ws.id,"ventas"),orderBy("fecha","desc")));
+      const vv=snap.docs.map(d=>({id:d.id,...d.data(),wsId:ws.id,wsName:ws.name}));
+      todasVentas=[...todasVentas,...vv];
+      wsConVentas.push({...ws,ventas:vv,total:vv.reduce((a,v)=>a+(v.monto||0),0)});
+    }catch(e){}
   }
 
-  // Filtros de fecha
-  const now = new Date();
-  const mesInicio = new Date(now.getFullYear(), now.getMonth(), 1);
+  let fWs="", fDesde="", fHasta="";
 
-  // Métricas globales
-  const totalGlobal = todasVentas.reduce((a,v)=>a+(v.monto||0),0);
-  const totalMes    = todasVentas.filter(v=>{
-    if(!v.fecha) return false;
-    const d = v.fecha.toDate ? v.fecha.toDate() : new Date(v.fecha);
-    return d >= mesInicio;
-  }).reduce((a,v)=>a+(v.monto||0),0);
-  const totalFb = todasVentas.filter(v=>v.canal?.toLowerCase()==="facebook").reduce((a,v)=>a+(v.monto||0),0);
-  const totalIg = todasVentas.filter(v=>v.canal?.toLowerCase()==="instagram").reduce((a,v)=>a+(v.monto||0),0);
-  const totalWa = todasVentas.filter(v=>v.canal?.toLowerCase()==="whatsapp").reduce((a,v)=>a+(v.monto||0),0);
+  function filtradas(){
+    return todasVentas.filter(v=>{
+      if(fWs && v.wsId!==fWs) return false;
+      if(fDesde){ const d=v.fecha?.toDate?.()||new Date(0); if(d<new Date(fDesde)) return false; }
+      if(fHasta){ const d=v.fecha?.toDate?.()||new Date(0); if(d>new Date(fHasta+"T23:59:59")) return false; }
+      return true;
+    });
+  }
 
-  // Ranking workspaces
-  const ranking = [...wsConVentas].sort((a,b)=>b.total-a.total);
-  const maxTotal = ranking[0]?.total||1;
+  function renderDash(){
+    const vf=filtradas();
+    const {total,ticket,porCanal,porMes}=calcMetricas(vf);
+    const ranking=[...wsConVentas].map(w=>({
+      ...w,
+      totalFilt:vf.filter(v=>v.wsId===w.id).reduce((a,v)=>a+(v.monto||0),0)
+    })).sort((a,b)=>b.totalFilt-a.totalFilt);
+    const maxR=ranking[0]?.totalFilt||1;
+    const recientes=[...vf].sort((a,b)=>{
+      const da=a.fecha?.toDate?.()||new Date(0);
+      const db2=b.fecha?.toDate?.()||new Date(0);
+      return db2-da;
+    }).slice(0,8);
 
-  // Últimas 8 ventas globales
-  const recientes = [...todasVentas].sort((a,b)=>{
-    const da = a.fecha?.toDate?.()||new Date(0);
-    const db2 = b.fecha?.toDate?.()||new Date(0);
-    return db2-da;
-  }).slice(0,8);
+    const now=new Date();
+    const mesInicio=new Date(now.getFullYear(),now.getMonth(),1);
+    const totalMes=vf.filter(v=>{
+      if(!v.fecha) return false;
+      const d=v.fecha.toDate?v.fecha.toDate():new Date(v.fecha);
+      return d>=mesInicio;
+    }).reduce((a,v)=>a+(v.monto||0),0);
 
-  el.innerHTML = `
-  <div class="page-header">
-    <div>
-      <div class="page-title">Panel de Agencia</div>
-      <div class="page-subtitle">Vista consolidada · ${S.workspaces.length} cliente${S.workspaces.length!==1?"s":""} activos</div>
+    document.getElementById("dash-content").innerHTML=`
+    <div class="metrics-grid">
+      <div class="metric-card"><div class="metric-label">Total Facturado</div><div class="metric-value hi">${fmtMXN(total)}</div><div class="metric-sub">${vf.length} ventas</div></div>
+      <div class="metric-card"><div class="metric-label">Este Mes</div><div class="metric-value">${fmtMXN(totalMes)}</div><div class="metric-sub">${now.toLocaleDateString("es-MX",{month:"long"})}</div></div>
+      <div class="metric-card"><div class="metric-label">Clientes</div><div class="metric-value">${S.workspaces.length}</div><div class="metric-sub">activos</div></div>
+      <div class="metric-card"><div class="metric-label">Ticket Promedio</div><div class="metric-value">${fmtMXN(ticket)}</div><div class="metric-sub">por venta</div></div>
     </div>
-  </div>
 
-  <div class="metrics-grid">
-    <div class="metric-card">
-      <div class="metric-label">Total Facturado</div>
-      <div class="metric-value hi">${fmtMXN(totalGlobal)}</div>
-      <div class="metric-sub">${todasVentas.length} ventas totales</div>
+    <div class="grid-2 mb-4">
+      <div class="card">
+        <div class="section-title">Tendencia mensual</div>
+        ${graficaLinea(porMes)}
+      </div>
+      <div class="card">
+        <div class="section-title">Ventas por canal</div>
+        ${graficaPastel(CANALES_LIST.filter(c=>porCanal[c]>0).map(c=>({label:c.charAt(0).toUpperCase()+c.slice(1),valor:porCanal[c],color:CANALES_COLORS[c]})))}
+        <div class="divider"></div>
+        ${graficaBarras(CANALES_LIST.filter(c=>porCanal[c]>0).map(c=>({label:c.charAt(0).toUpperCase()+c.slice(1),valor:porCanal[c],color:CANALES_COLORS[c]})))}
+      </div>
     </div>
-    <div class="metric-card">
-      <div class="metric-label">Este Mes</div>
-      <div class="metric-value">${fmtMXN(totalMes)}</div>
-      <div class="metric-sub">${now.toLocaleDateString("es-MX",{month:"long",year:"numeric"})}</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Clientes</div>
-      <div class="metric-value">${S.workspaces.length}</div>
-      <div class="metric-sub">workspaces activos</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Ticket Promedio</div>
-      <div class="metric-value">${fmtMXN(todasVentas.length ? totalGlobal/todasVentas.length : 0)}</div>
-      <div class="metric-sub">por venta</div>
-    </div>
-  </div>
 
-  <div class="grid-2 mb-4">
-    <div class="card">
-      <div class="section-title">Ranking de clientes</div>
-      ${ranking.length===0
-        ? `<div class="empty-state" style="padding:24px"><h3>Sin datos</h3></div>`
-        : ranking.map((w,i)=>`
+    <div class="grid-2 mb-4">
+      <div class="card">
+        <div class="section-title">Ranking de clientes</div>
+        ${ranking.map((w,i)=>`
         <div class="ranking-item">
           <span class="ranking-num">${i+1}</span>
           <div class="avatar" style="border-radius:6px;width:28px;height:28px;font-size:11px">${initials(w.name)}</div>
           <div style="flex:1;min-width:0">
             <div class="flex justify-between mb-1">
               <span class="font-bold text-sm truncate">${w.name}</span>
-              <span class="text-sm text-primary font-bold">${fmtMXN(w.total)}</span>
+              <span class="text-sm text-primary font-bold">${fmtMXN(w.totalFilt)}</span>
             </div>
-            <div class="ranking-bar-wrap">
-              <div class="ranking-bar" style="width:${Math.round((w.total/maxTotal)*100)}%"></div>
-            </div>
+            <div class="ranking-bar-wrap"><div class="ranking-bar" style="width:${Math.round((w.totalFilt/maxR)*100)}%"></div></div>
           </div>
-        </div>`).join("")}
-    </div>
-
-    <div class="card">
-      <div class="section-title">Ventas por canal</div>
-      ${[
-        {label:"Facebook",val:totalFb,cls:"badge-fb"},
-        {label:"Instagram",val:totalIg,cls:"badge-ig"},
-        {label:"WhatsApp",val:totalWa,cls:"badge-wa"},
-      ].map(c=>{
-        const pct = totalGlobal>0 ? Math.round((c.val/totalGlobal)*100):0;
-        return `<div class="stat-row">
-          <span class="stat-key"><span class="badge ${c.cls}">${c.label}</span></span>
-          <div class="flex items-center gap-2">
-            <div style="width:80px;background:var(--border);border-radius:4px;height:4px">
-              <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:4px"></div>
-            </div>
-            <span class="stat-val">${fmtMXN(c.val)}</span>
-          </div>
-        </div>`;
-      }).join("")}
-      <div class="divider"></div>
-      <div class="section-title" style="margin-top:4px">Resumen por cliente</div>
-      ${wsConVentas.map(w=>`
-      <div class="stat-row">
-        <span class="stat-key truncate" style="max-width:140px">${w.name}</span>
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-muted">${w.ventas.length} ventas</span>
-          <span class="stat-val">${fmtMXN(w.total)}</span>
-        </div>
-      </div>`).join("")||`<div class="text-muted text-sm" style="padding:12px 0">Sin workspaces</div>`}
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="section-title">Últimas ventas — todos los clientes</div>
-    ${recientes.length===0
-      ? `<div class="empty-state" style="padding:24px"><h3>Sin ventas registradas</h3></div>`
-      : `<div class="table-wrap">
-        <table>
-          <thead><tr><th>Cliente</th><th>Canal</th><th>Producto</th><th>Monto</th><th>Vendedor</th><th>Fecha</th></tr></thead>
-          <tbody>
-            ${recientes.map(v=>`<tr>
-              <td><span class="chip">${v.wsName||"—"}</span></td>
-              <td>${canalBadge(v.canal||"")}</td>
-              <td class="truncate" style="max-width:160px">${v.producto||"—"}</td>
+          <button class="btn-icon" onclick="window._verDashWs('${w.id}')" title="Ver dashboard">${ico("eye")}</button>
+        </div>`).join("")||`<div class="empty-state" style="padding:24px"><h3>Sin datos</h3></div>`}
+      </div>
+      <div class="card">
+        <div class="section-title">Últimas ventas</div>
+        ${recientes.length===0
+          ? `<div class="empty-state" style="padding:24px"><h3>Sin ventas</h3></div>`
+          : `<div class="table-wrap"><table>
+            <thead><tr><th>Cliente</th><th>Canal</th><th>Producto</th><th>Monto</th><th>Fecha</th></tr></thead>
+            <tbody>${recientes.map(v=>`<tr>
+              <td><span class="chip" style="font-size:11px">${v.wsName||"—"}</span></td>
+              <td>${canalBadge(v.canal||"",v.otroCual||"")}</td>
+              <td class="truncate" style="max-width:120px">${v.producto||"—"}</td>
               <td class="font-bold text-primary">${fmtMXN(v.monto)}</td>
-              <td class="truncate" style="max-width:140px">${v.vendedorEmail||"—"}</td>
               <td>${fmtDate(v.fecha)}</td>
-            </tr>`).join("")}
-          </tbody>
-        </table>
-      </div>`}
-  </div>`;
+            </tr>`).join("")}</tbody>
+          </table></div>`}
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML=`
+  <div class="page-header">
+    <div><div class="page-title">Panel de Agencia</div>
+    <div class="page-subtitle">Vista consolidada · ${S.workspaces.length} cliente${S.workspaces.length!==1?"s":""} activos</div></div>
+  </div>
+  <div class="filters-bar">
+    <div class="form-group">
+      <label class="form-label">Cliente</label>
+      <select class="form-select" id="pa-ws">
+        <option value="">Todos</option>
+        ${S.workspaces.map(w=>`<option value="${w.id}">${w.name}</option>`).join("")}
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Desde</label><input class="form-input" id="pa-desde" type="date" /></div>
+    <div class="form-group"><label class="form-label">Hasta</label><input class="form-input" id="pa-hasta" type="date" /></div>
+  </div>
+  <div id="dash-content"></div>`;
+
+  renderDash();
+  document.getElementById("pa-ws").addEventListener("change",e=>{fWs=e.target.value;renderDash();});
+  document.getElementById("pa-desde").addEventListener("change",e=>{fDesde=e.target.value;renderDash();});
+  document.getElementById("pa-hasta").addEventListener("change",e=>{fHasta=e.target.value;renderDash();});
+
+  window._verDashWs=(id)=>{ S.currentWorkspace=S.workspaces.find(w=>w.id===id)||null; S.section="dashboard"; updateNav(); renderSection("dashboard"); };
 }
 
 // ─────────────────────────────────────────
@@ -770,88 +846,103 @@ async function secPanelAgencia(el){
 async function secDashboard(el){
   const wsId = getWsId();
   if(!wsId){ el.innerHTML=emptyWs(); return; }
+  el.innerHTML=`<div class="section-loading"><div class="spinner"></div></div>`;
 
-  const snap = await getDocs(query(collection(db,"workspaces",wsId,"ventas"),orderBy("fecha","desc")));
-  const ventas = snap.docs.map(d=>({id:d.id,...d.data()}));
-  const ws = S.currentWorkspace || S.workspaces[0];
+  const snap=await getDocs(query(collection(db,"workspaces",wsId,"ventas"),orderBy("fecha","desc")));
+  const todasVentas=snap.docs.map(d=>({id:d.id,...d.data()}));
+  const ws=S.currentWorkspace||S.workspaces[0];
+  const meta=ws?.metaMensual||0;
 
-  const total    = ventas.reduce((a,v)=>a+(v.monto||0),0);
-  const totalFb  = ventas.filter(v=>v.canal?.toLowerCase()==="facebook").reduce((a,v)=>a+(v.monto||0),0);
-  const totalIg  = ventas.filter(v=>v.canal?.toLowerCase()==="instagram").reduce((a,v)=>a+(v.monto||0),0);
-  const totalWa  = ventas.filter(v=>v.canal?.toLowerCase()==="whatsapp").reduce((a,v)=>a+(v.monto||0),0);
-  const meta     = ws?.metaMensual||0;
-  const pct      = meta>0 ? Math.min(100,Math.round((total/meta)*100)) : 0;
-  const recientes= ventas.slice(0,6);
+  let fDesde="", fHasta="", fCanal="";
 
-  el.innerHTML = `
-  <div class="page-header">
-    <div>
-      <div class="page-title">${ws?.name||"Dashboard"}</div>
-      <div class="page-subtitle">Resumen de ventas · ${ventas.length} registro${ventas.length!==1?"s":""}</div>
+  function filtradas(){
+    return todasVentas.filter(v=>{
+      if(fCanal && (v.canal||"").toLowerCase()!==fCanal) return false;
+      if(fDesde){ const d=v.fecha?.toDate?.()||new Date(0); if(d<new Date(fDesde)) return false; }
+      if(fHasta){ const d=v.fecha?.toDate?.()||new Date(0); if(d>new Date(fHasta+"T23:59:59")) return false; }
+      return true;
+    });
+  }
+
+  function renderDash(){
+    const ventas=filtradas();
+    const {total,ticket,porCanal,porMes}=calcMetricas(ventas);
+    const pct=meta>0?Math.min(100,Math.round((total/meta)*100)):0;
+    const recientes=ventas.slice(0,6);
+
+    document.getElementById("dash-content").innerHTML=`
+    <div class="metrics-grid">
+      <div class="metric-card"><div class="metric-label">Total Vendido</div><div class="metric-value hi">${fmtMXN(total)}</div><div class="metric-sub">${ventas.length} ventas</div></div>
+      <div class="metric-card">
+        <div class="metric-label">Meta Mensual</div>
+        <div class="metric-value">${fmtMXN(meta)}</div>
+        <div class="metric-sub">
+          <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+          <span style="margin-top:4px;display:block">${pct}% completado</span>
+        </div>
+      </div>
+      <div class="metric-card"><div class="metric-label">Ticket Promedio</div><div class="metric-value">${fmtMXN(ticket)}</div><div class="metric-sub">por venta</div></div>
+      <div class="metric-card"><div class="metric-label">Campañas activas</div><div class="metric-value">${[...new Set(ventas.map(v=>v.campana).filter(Boolean))].length}</div><div class="metric-sub">distintas</div></div>
     </div>
-    <button class="btn btn-primary" id="btn-reg">${ico("plus")} Registrar venta</button>
-  </div>
 
-  <div class="metrics-grid">
-    <div class="metric-card">
-      <div class="metric-label">Total Vendido</div>
-      <div class="metric-value hi">${fmtMXN(total)}</div>
-      <div class="metric-sub">${ventas.length} ventas</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Meta Mensual</div>
-      <div class="metric-value">${fmtMXN(meta)}</div>
-      <div class="metric-sub">
-        <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
-        <span style="margin-top:4px;display:block">${pct}% completado</span>
+    <div class="grid-2 mb-4">
+      <div class="card">
+        <div class="section-title">Tendencia mensual</div>
+        ${graficaLinea(porMes)}
+      </div>
+      <div class="card">
+        <div class="section-title">Distribución por canal</div>
+        ${graficaPastel(CANALES_LIST.filter(c=>porCanal[c]>0).map(c=>({label:c.charAt(0).toUpperCase()+c.slice(1),valor:porCanal[c],color:CANALES_COLORS[c]})))}
+        <div class="divider"></div>
+        ${graficaBarras(CANALES_LIST.filter(c=>porCanal[c]>0).map(c=>({label:c.charAt(0).toUpperCase()+c.slice(1),valor:porCanal[c],color:CANALES_COLORS[c]})))}
       </div>
     </div>
-    <div class="metric-card">
-      <div class="metric-label">Facebook</div>
-      <div class="metric-value">${fmtMXN(totalFb)}</div>
-      <div class="metric-sub">${ventas.filter(v=>v.canal?.toLowerCase()==="facebook").length} ventas</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Instagram</div>
-      <div class="metric-value">${fmtMXN(totalIg)}</div>
-      <div class="metric-sub">${ventas.filter(v=>v.canal?.toLowerCase()==="instagram").length} ventas</div>
-    </div>
-  </div>
 
-  <div class="grid-2">
     <div class="card">
       <div class="section-title">Últimas ventas</div>
       ${recientes.length===0
-        ? `<div class="empty-state" style="padding:24px">${ico("dollar")}<h3>Sin ventas aún</h3></div>`
+        ? `<div class="empty-state" style="padding:24px">${ico("dollar")}<h3>Sin ventas en este periodo</h3></div>`
         : `<div class="table-wrap"><table>
-          <thead><tr><th>Canal</th><th>Producto</th><th>Monto</th><th>Fecha</th></tr></thead>
+          <thead><tr><th>Canal</th><th>Campaña</th><th>Producto</th><th>Monto</th><th>Fecha</th></tr></thead>
           <tbody>${recientes.map(v=>`<tr>
-            <td>${canalBadge(v.canal||"")}</td>
+            <td>${canalBadge(v.canal||"",v.otroCual||"")}</td>
+            <td>${v.campana||"—"}</td>
             <td class="truncate" style="max-width:140px">${v.producto||"—"}</td>
             <td class="font-bold text-primary">${fmtMXN(v.monto)}</td>
             <td>${fmtDate(v.fecha)}</td>
           </tr>`).join("")}</tbody>
         </table></div>`}
-    </div>
-    <div class="card">
-      <div class="section-title">Distribución por canal</div>
-      ${[{label:"Facebook",val:totalFb},{label:"Instagram",val:totalIg},{label:"WhatsApp",val:totalWa}].map(c=>{
-        const p2 = total>0?Math.round((c.val/total)*100):0;
-        return `<div class="stat-row">
-          <span class="stat-key">${c.label}</span>
-          <div class="flex items-center gap-2">
-            <div style="width:80px;background:var(--border);border-radius:4px;height:4px">
-              <div style="background:var(--primary);height:100%;width:${p2}%;border-radius:4px"></div>
-            </div>
-            <span class="stat-val">${fmtMXN(c.val)}</span>
-          </div>
-        </div>`;
-      }).join("")}
-      <div class="divider"></div>
-      <div class="stat-row"><span class="stat-key">Ticket promedio</span><span class="stat-val">${fmtMXN(ventas.length?total/ventas.length:0)}</span></div>
-    </div>
-  </div>`;
+    </div>`;
+  }
 
+  el.innerHTML=`
+  <div class="page-header">
+    <div><div class="page-title">${ws?.name||"Dashboard"}</div>
+    <div class="page-subtitle">Resumen de ventas · ${todasVentas.length} registros totales</div></div>
+    ${!isAdmin()?`<button class="btn btn-primary" id="btn-reg">${ico("plus")} Registrar venta</button>`:""}
+  </div>
+  <div class="filters-bar">
+    <div class="form-group">
+      <label class="form-label">Canal</label>
+      <select class="form-select" id="db-canal">
+        <option value="">Todos</option>
+        <option value="facebook">Facebook</option>
+        <option value="instagram">Instagram</option>
+        <option value="tiktok">TikTok</option>
+        <option value="google">Google</option>
+        <option value="referido">Referido</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Desde</label><input class="form-input" id="db-desde" type="date" /></div>
+    <div class="form-group"><label class="form-label">Hasta</label><input class="form-input" id="db-hasta" type="date" /></div>
+  </div>
+  <div id="dash-content"></div>`;
+
+  renderDash();
+  document.getElementById("db-canal")?.addEventListener("change",e=>{fCanal=e.target.value;renderDash();});
+  document.getElementById("db-desde")?.addEventListener("change",e=>{fDesde=e.target.value;renderDash();});
+  document.getElementById("db-hasta")?.addEventListener("change",e=>{fHasta=e.target.value;renderDash();});
   document.getElementById("btn-reg")?.addEventListener("click",()=>{ S.section="registrar-venta"; updateNav(); renderSection("registrar-venta"); });
 }
 
