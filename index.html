@@ -410,8 +410,25 @@ async function doLogin(){
   const btn   = document.getElementById("btn-login");
   if(!email||!pass){ toast("Completa todos los campos","error"); return; }
   btn.disabled=true; btn.textContent="Ingresando…";
-  try{ await signInWithEmailAndPassword(auth, email, pass); }
-  catch(e){ toast("Credenciales incorrectas","error"); btn.disabled=false; btn.textContent="Entrar"; }
+  const timeout = setTimeout(()=>{
+    btn.disabled=false; btn.textContent="Entrar";
+    toast("No se pudo conectar. Revisa tu internet e intenta de nuevo.","error");
+  }, 8000);
+  try{
+    await signInWithEmailAndPassword(auth, email, pass);
+    clearTimeout(timeout);
+  } catch(e){
+    clearTimeout(timeout);
+    btn.disabled=false; btn.textContent="Entrar";
+    const msg = e.code==="auth/wrong-password"||e.code==="auth/user-not-found"||e.code==="auth/invalid-credential"
+      ? "Correo o contraseña incorrectos"
+      : e.code==="auth/too-many-requests"
+      ? "Demasiados intentos. Espera unos minutos."
+      : e.code==="auth/network-request-failed"
+      ? "Sin conexión. Revisa tu internet."
+      : "Error al ingresar. Intenta de nuevo.";
+    toast(msg,"error");
+  }
 }
 async function doReset(){
   const email = document.getElementById("r-email").value.trim();
@@ -800,70 +817,112 @@ async function secDashboard(el){
 // ─────────────────────────────────────────
 // REGISTRAR VENTA
 // ─────────────────────────────────────────
+function lanzarConfeti(){
+  const colors=["#e8ff47","#ffffff","#22c55e","#3b82f6","#f59e0b"];
+  for(let i=0;i<120;i++){
+    const el=document.createElement("div");
+    const size=Math.random()*10+6;
+    el.style.cssText=`position:fixed;top:-20px;left:${Math.random()*100}vw;width:${size}px;height:${size}px;background:${colors[Math.floor(Math.random()*colors.length)]};border-radius:${Math.random()>0.5?"50%":"2px"};z-index:9999;pointer-events:none;opacity:1;transition:none`;
+    document.body.appendChild(el);
+    const dur=Math.random()*2000+1500;
+    const drift=(Math.random()-0.5)*200;
+    el.animate([
+      {transform:`translate(0,0) rotate(0deg)`,opacity:1},
+      {transform:`translate(${drift}px,110vh) rotate(${Math.random()*720}deg)`,opacity:0}
+    ],{duration:dur,easing:"cubic-bezier(0.25,0.46,0.45,0.94)",delay:Math.random()*600}).onfinish=()=>el.remove();
+  }
+}
+
 async function secRegistrarVenta(el){
   const wsId = getWsId();
   if(!wsId){ el.innerHTML=emptyWs(); return; }
+
+  // Cargar ventas recientes del vendedor
+  let ventasRecientes=[];
+  try{
+    const snap=await getDocs(query(
+      collection(db,"workspaces",wsId,"ventas"),
+      where("vendedorId","==",S.user.uid),
+      orderBy("fecha","desc")
+    ));
+    ventasRecientes=snap.docs.slice(0,8).map(d=>({id:d.id,...d.data()}));
+  }catch(e){}
 
   el.innerHTML = `
   <div class="page-header">
     <div><div class="page-title">Registrar Venta</div>
     <div class="page-subtitle">Workspace: ${S.currentWorkspace?.name||S.workspaces[0]?.name||""}</div></div>
   </div>
-  <div class="card" style="max-width:600px">
-    <div class="flex flex-col gap-4">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Canal <span class="req">*</span></label>
-          <select class="form-select" id="v-canal">
-            <option value="">Selecciona canal</option>
-            <option value="facebook">Facebook</option>
-            <option value="instagram">Instagram</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="referido">Referido</option>
-            <option value="otro">Otro</option>
-          </select>
+  <div class="grid-2" style="align-items:start">
+    <div class="card">
+      <div class="section-title">Nueva venta</div>
+      <div class="flex flex-col gap-4">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Canal <span class="req">*</span></label>
+            <select class="form-select" id="v-canal">
+              <option value="">Selecciona canal</option>
+              <option value="facebook">Facebook</option>
+              <option value="instagram">Instagram</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="referido">Referido</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Campaña</label>
+            <input class="form-input" id="v-campana" placeholder="Nombre de campaña" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Producto / Servicio <span class="req">*</span></label>
+            <input class="form-input" id="v-producto" placeholder="ej. Consultoría mensual…" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Monto (MXN) <span class="req">*</span></label>
+            <input class="form-input" id="v-monto" type="number" placeholder="0.00" min="0" step="0.01" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Nombre del cliente</label>
+            <input class="form-input" id="v-cliente" placeholder="Nombre completo" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">WhatsApp</label>
+            <input class="form-input" id="v-wa" type="tel" placeholder="+52 55 0000 0000" />
+          </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Campaña</label>
-          <input class="form-input" id="v-campana" placeholder="Nombre de campaña" />
+          <label class="form-label">Fecha de venta <span class="req">*</span></label>
+          <input class="form-input" id="v-fecha" type="date" value="${new Date().toISOString().slice(0,10)}" />
         </div>
+        <div class="form-group">
+          <label class="form-label">Notas</label>
+          <textarea class="form-textarea" id="v-notas" placeholder="Descuentos aplicados, contexto…"></textarea>
+        </div>
+        <button class="btn btn-primary btn-lg" id="btn-guardar">${ico("check")} Guardar Venta</button>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Producto / Servicio <span class="req">*</span></label>
-          <input class="form-input" id="v-producto" placeholder="ej. Consultoría mensual, Paquete promo…" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Monto (MXN) <span class="req">*</span></label>
-          <input class="form-input" id="v-monto" type="number" placeholder="0.00" min="0" step="0.01" />
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Nombre del cliente</label>
-          <input class="form-input" id="v-cliente" placeholder="Nombre completo" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">WhatsApp</label>
-          <input class="form-input" id="v-wa" type="tel" placeholder="+52 55 0000 0000" />
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Fecha de venta <span class="req">*</span></label>
-        <input class="form-input" id="v-fecha" type="date" value="${new Date().toISOString().slice(0,10)}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Notas</label>
-        <textarea class="form-textarea" id="v-notas" placeholder="Descuentos aplicados, contexto de la venta…"></textarea>
-      </div>
-      <div class="flex gap-3 justify-end">
-        <button class="btn btn-ghost" id="btn-limpiar">Limpiar</button>
-        <button class="btn btn-primary" id="btn-guardar">${ico("check")} Guardar Venta</button>
+    </div>
+    <div class="card">
+      <div class="section-title">Mis últimas ventas</div>
+      <div id="ventas-recientes-list">
+        ${ventasRecientes.length===0
+          ? `<div class="empty-state" style="padding:24px">${ico("dollar")}<h3>Sin ventas aún</h3><p>Registra tu primera venta</p></div>`
+          : `<div class="table-wrap"><table>
+            <thead><tr><th>Canal</th><th>Producto</th><th>Monto</th><th>Fecha</th></tr></thead>
+            <tbody>${ventasRecientes.map(v=>`<tr>
+              <td>${canalBadge(v.canal||"")}</td>
+              <td class="truncate" style="max-width:120px">${v.producto||"—"}</td>
+              <td class="font-bold text-primary">${fmtMXN(v.monto)}</td>
+              <td>${fmtDate(v.fecha)}</td>
+            </tr>`).join("")}</tbody>
+          </table></div>`}
       </div>
     </div>
   </div>`;
 
-  document.getElementById("btn-limpiar")?.addEventListener("click",()=>secRegistrarVenta(el));
   document.getElementById("btn-guardar")?.addEventListener("click", async()=>{
     const canal    = document.getElementById("v-canal").value;
     const producto = document.getElementById("v-producto").value.trim();
@@ -871,7 +930,7 @@ async function secRegistrarVenta(el){
     const fechaStr = document.getElementById("v-fecha").value;
     if(!canal||!producto||!monto||!fechaStr){ toast("Completa los campos requeridos","error"); return; }
     const btn = document.getElementById("btn-guardar");
-    btn.disabled=true; btn.innerHTML=`<div class="spinner" style="width:16px;height:16px"></div> Guardando…`;
+    btn.disabled=true; btn.innerHTML=`<div class="spinner" style="width:16px;height:16px;margin:0 auto"></div>`;
     try{
       await addDoc(collection(db,"workspaces",wsId,"ventas"),{
         canal, producto, monto,
@@ -884,7 +943,19 @@ async function secRegistrarVenta(el){
         vendedorEmail: S.user.email,
         creadoEn: serverTimestamp(),
       });
-      toast("¡Venta registrada!","success");
+      lanzarConfeti();
+      toast("🎉 ¡Venta registrada!","success");
+      // Limpiar formulario
+      document.getElementById("v-canal").value="";
+      document.getElementById("v-campana").value="";
+      document.getElementById("v-producto").value="";
+      document.getElementById("v-monto").value="";
+      document.getElementById("v-cliente").value="";
+      document.getElementById("v-wa").value="";
+      document.getElementById("v-notas").value="";
+      document.getElementById("v-fecha").value=new Date().toISOString().slice(0,10);
+      btn.disabled=false; btn.innerHTML=`${ico("check")} Guardar Venta`;
+      // Recargar lista de ventas recientes
       secRegistrarVenta(el);
     }catch(e){ toast("Error al guardar","error"); btn.disabled=false; btn.innerHTML=`${ico("check")} Guardar Venta`; }
   });
@@ -1038,77 +1109,222 @@ function exportCSV(ventas){
 }
 
 // ─────────────────────────────────────────
-// ROAS CALCULATOR
+// ROAS — Admin calcula y publica / Cliente ve historial
 // ─────────────────────────────────────────
+function roasClasificacion(r){
+  if(r<2)  return {label:"Malo",       color:"#ef4444", emoji:"🔴"};
+  if(r<3)  return {label:"Regular",    color:"#f59e0b", emoji:"🟠"};
+  if(r<4)  return {label:"Aceptable",  color:"#eab308", emoji:"🟡"};
+  if(r<5)  return {label:"Bueno",      color:"#22c55e", emoji:"🟢"};
+  if(r<7)  return {label:"Muy bueno",  color:"#3b82f6", emoji:"🔵"};
+  return   {label:"Excelente",         color:"#a855f7", emoji:"🟣"};
+}
+
+function roasTablaReferencia(){
+  const filas=[
+    {rango:"Menos de 2", cls:"badge-error",   label:"Malo"},
+    {rango:"2 a 3",      cls:"badge-warning",  label:"Regular"},
+    {rango:"3 a 4",      cls:"badge-primary",  label:"Aceptable"},
+    {rango:"4 a 5",      cls:"badge-success",  label:"Bueno"},
+    {rango:"5 a 7",      cls:"badge-info",     label:"Muy bueno"},
+    {rango:"Más de 7",   cls:"",               label:"Excelente", style:"background:#a855f726;color:#a855f7"},
+  ];
+  return `<div class="section-title">Tabla de referencia</div>
+  ${filas.map(f=>`<div class="stat-row">
+    <span class="stat-key">${f.rango}</span>
+    <span class="badge ${f.cls}" ${f.style?`style="${f.style}"`:""}>${f.label}</span>
+  </div>`).join("")}`;
+}
+
 async function secROAS(el){
-  el.innerHTML = `
+  const wsId = getWsId();
+
+  // VISTA CLIENTE — solo ve reportes publicados
+  if(!isAdmin()){
+    if(!wsId){ el.innerHTML=emptyWs(); return; }
+    const snap = await getDocs(query(
+      collection(db,"workspaces",wsId,"roas_reportes"),
+      orderBy("creadoEn","desc")
+    ));
+    const reportes = snap.docs.map(d=>({id:d.id,...d.data()}));
+
+    el.innerHTML=`
+    <div class="page-header">
+      <div><div class="page-title">ROAS</div>
+      <div class="page-subtitle">Resultados de tus campañas</div></div>
+    </div>
+    <div class="grid-2" style="align-items:start">
+      <div>
+        ${reportes.length===0
+          ? `<div class="card"><div class="empty-state">${ico("bar-chart")}<h3>Pendiente de publicar por la agencia</h3><p>Aquí verás tus resultados de campaña cuando estén listos.</p></div></div>`
+          : reportes.map((r,i)=>{
+              const cls=roasClasificacion(parseFloat(r.roas));
+              return `<div class="card mb-4">
+                <div class="flex justify-between items-center mb-4">
+                  <div>
+                    <div class="font-head font-800" style="font-size:15px">${r.nombre||"Reporte"}</div>
+                    <div class="text-sm text-muted">${r.periodo||""} · Publicado ${fmtDate(r.creadoEn)}</div>
+                  </div>
+                  <span class="badge" style="background:${cls.color}26;color:${cls.color};font-size:13px">${cls.emoji} ${cls.label}</span>
+                </div>
+                <div class="roas-display mb-4" style="border-color:${cls.color}">
+                  <div class="roas-number" style="color:${cls.color}">${r.roas}x</div>
+                  <div class="roas-label">Retorno en Ads</div>
+                </div>
+                <div class="stat-row"><span class="stat-key">Inversión</span><span class="stat-val">${fmtMXN(r.inversion)}</span></div>
+                <div class="stat-row"><span class="stat-key">Ingresos generados</span><span class="stat-val text-success">${fmtMXN(r.ingresos)}</span></div>
+                <div class="stat-row"><span class="stat-key">ROI</span><span class="stat-val" style="color:${cls.color}">${r.roi}%</span></div>
+                ${r.leads?`<div class="stat-row"><span class="stat-key">Leads</span><span class="stat-val">${r.leads}</span></div>`:""}
+              </div>`;
+            }).join("")}
+      </div>
+      <div class="card">${roasTablaReferencia()}</div>
+    </div>`;
+    return;
+  }
+
+  // VISTA ADMIN — calcula y publica
+  if(!wsId){ el.innerHTML=emptyWs(); return; }
+
+  // Cargar reportes existentes
+  let reportes=[];
+  try{
+    const snap=await getDocs(query(collection(db,"workspaces",wsId,"roas_reportes"),orderBy("creadoEn","desc")));
+    reportes=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){}
+
+  el.innerHTML=`
   <div class="page-header">
     <div><div class="page-title">ROAS Calculator</div>
-    <div class="page-subtitle">Calcula y comparte los resultados con tu cliente</div></div>
+    <div class="page-subtitle">Calcula y publica resultados para ${S.currentWorkspace?.name||""}</div></div>
   </div>
-  <div class="grid-2">
-    <div class="card">
-      <div class="section-title">Datos de campaña</div>
-      <div class="flex flex-col gap-4">
-        <div class="form-group"><label class="form-label">Cliente / Campaña</label><input class="form-input" id="r-nombre" placeholder="ej. Dr. Maravert · Julio 2025" /></div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Inversión en Ads (MXN) <span class="req">*</span></label><input class="form-input" id="r-inv" type="number" placeholder="0" /></div>
-          <div class="form-group"><label class="form-label">Ingresos Generados (MXN) <span class="req">*</span></label><input class="form-input" id="r-ing" type="number" placeholder="0" /></div>
+  <div class="grid-2" style="align-items:start">
+    <div class="flex flex-col gap-4">
+      <div class="card">
+        <div class="section-title">Calcular ROAS</div>
+        <div class="flex flex-col gap-4">
+          <div class="form-group"><label class="form-label">Nombre del reporte</label>
+            <input class="form-input" id="r-nombre" placeholder="ej. Campaña Julio 2025" /></div>
+          <div class="form-group"><label class="form-label">Periodo</label>
+            <input class="form-input" id="r-periodo" placeholder="ej. 1 Jul – 31 Jul 2025" /></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Desde</label>
+              <input class="form-input" id="r-desde" type="date" /></div>
+            <div class="form-group"><label class="form-label">Hasta</label>
+              <input class="form-input" id="r-hasta" type="date" /></div>
+          </div>
+          <div class="form-group"><label class="form-label">Inversión en Meta Ads (MXN) <span class="req">*</span></label>
+            <input class="form-input" id="r-inv" type="number" placeholder="0" /></div>
+          <div class="form-group"><label class="form-label">Leads generados</label>
+            <input class="form-input" id="r-leads" type="number" placeholder="0" /></div>
+          <div class="flex gap-3">
+            <button class="btn btn-secondary" style="flex:1" id="btn-calc-roas">${ico("bar-chart")} Calcular</button>
+            <button class="btn btn-primary" style="flex:1" id="btn-pub-roas" disabled>${ico("check")} Publicar al cliente</button>
+          </div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Leads Generados</label><input class="form-input" id="r-leads" type="number" placeholder="0" /></div>
-          <div class="form-group"><label class="form-label">Ventas Cerradas</label><input class="form-input" id="r-ventas" type="number" placeholder="0" /></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Alcance</label><input class="form-input" id="r-alcance" type="number" placeholder="0" /></div>
-          <div class="form-group"><label class="form-label">Clics</label><input class="form-input" id="r-clics" type="number" placeholder="0" /></div>
-        </div>
-        <button class="btn btn-primary" id="btn-calc">${ico("bar-chart")} Calcular ROAS</button>
+      </div>
+      <div class="card" id="roas-preview">
+        <div class="empty-state">${ico("bar-chart")}<h3>Ingresa los datos y calcula</h3></div>
       </div>
     </div>
-    <div class="card" id="roas-result">
-      <div class="empty-state">${ico("bar-chart")}<h3>Ingresa los datos y presiona calcular</h3></div>
+    <div class="flex flex-col gap-4">
+      <div class="card">${roasTablaReferencia()}</div>
+      <div class="card">
+        <div class="section-title">Reportes publicados</div>
+        <div id="roas-historial">
+          ${reportes.length===0
+            ? `<div class="empty-state" style="padding:24px"><h3>Sin reportes publicados</h3></div>`
+            : reportes.map(r=>{
+                const cls=roasClasificacion(parseFloat(r.roas));
+                return `<div class="stat-row">
+                  <div>
+                    <div class="font-bold text-sm">${r.nombre||"Reporte"}</div>
+                    <div class="text-sm text-muted">${r.periodo||fmtDate(r.creadoEn)}</div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span style="font-family:var(--font-head);font-weight:800;color:${cls.color}">${r.roas}x</span>
+                    <button class="btn-icon" onclick="window._delRoas('${wsId}','${r.id}')">${ico("trash")}</button>
+                  </div>
+                </div>`;
+              }).join("")}
+        </div>
+      </div>
     </div>
   </div>`;
 
-  document.getElementById("btn-calc").addEventListener("click",()=>{
-    const inv   = parseFloat(document.getElementById("r-inv").value||0);
-    const ing   = parseFloat(document.getElementById("r-ing").value||0);
-    const leads = parseInt(document.getElementById("r-leads").value||0);
-    const vts   = parseInt(document.getElementById("r-ventas").value||0);
-    const alc   = parseInt(document.getElementById("r-alcance").value||0);
-    const clics = parseInt(document.getElementById("r-clics").value||0);
-    const nombre= document.getElementById("r-nombre").value||"Campaña";
-    if(!inv||!ing){ toast("Ingresa inversión e ingresos","error"); return; }
+  let resultadoActual=null;
 
-    const roas = (ing/inv).toFixed(2);
-    const roi  = (((ing-inv)/inv)*100).toFixed(1);
-    const cpl  = leads>0 ? (inv/leads).toFixed(2) : null;
-    const cvr  = leads>0 ? ((vts/leads)*100).toFixed(1) : null;
-    const ctr  = alc>0   ? ((clics/alc)*100).toFixed(2) : null;
-    const color= roas>=3 ? "var(--success)" : roas>=1 ? "var(--warning)" : "var(--error)";
+  document.getElementById("btn-calc-roas").addEventListener("click", async()=>{
+    const inv    = parseFloat(document.getElementById("r-inv").value||0);
+    const leads  = parseInt(document.getElementById("r-leads").value||0);
+    const desde  = document.getElementById("r-desde").value;
+    const hasta  = document.getElementById("r-hasta").value;
+    if(!inv){ toast("Ingresa la inversión en Ads","error"); return; }
 
-    document.getElementById("roas-result").innerHTML = `
-    <div class="section-title">${nombre}</div>
-    <div class="roas-display mb-4" style="border-color:${color}">
-      <div class="roas-number" style="color:${color}">${roas}x</div>
+    const btn=document.getElementById("btn-calc-roas");
+    btn.disabled=true; btn.innerHTML=`<div class="spinner" style="width:14px;height:14px"></div>`;
+
+    // Sumar ventas del periodo desde Firestore
+    let ingresos=0;
+    try{
+      const snap=await getDocs(query(collection(db,"workspaces",wsId,"ventas"),orderBy("fecha","desc")));
+      const ventas=snap.docs.map(d=>d.data());
+      ingresos=ventas.filter(v=>{
+        if(!desde&&!hasta) return true;
+        const d=v.fecha?.toDate?.()||new Date(0);
+        if(desde && d<new Date(desde)) return false;
+        if(hasta && d>new Date(hasta+"T23:59:59")) return false;
+        return true;
+      }).reduce((a,v)=>a+(v.monto||0),0);
+    }catch(e){ toast("Error cargando ventas","error"); }
+
+    const roas = inv>0 ? (ingresos/inv).toFixed(2) : "0.00";
+    const roi  = inv>0 ? (((ingresos-inv)/inv)*100).toFixed(1) : "0.0";
+    const cls  = roasClasificacion(parseFloat(roas));
+
+    resultadoActual={
+      nombre: document.getElementById("r-nombre").value||"Reporte",
+      periodo: document.getElementById("r-periodo").value||`${desde||""}${desde&&hasta?" – ":""}${hasta||""}`,
+      inversion: inv, ingresos, roas, roi, leads,
+    };
+
+    document.getElementById("roas-preview").innerHTML=`
+    <div class="flex justify-between items-center mb-4">
+      <div class="font-head font-800">${resultadoActual.nombre}</div>
+      <span class="badge" style="background:${cls.color}26;color:${cls.color}">${cls.emoji} ${cls.label}</span>
+    </div>
+    <div class="roas-display mb-4" style="border-color:${cls.color}">
+      <div class="roas-number" style="color:${cls.color}">${roas}x</div>
       <div class="roas-label">ROAS · Retorno en Ads</div>
     </div>
     <div class="stat-row"><span class="stat-key">Inversión</span><span class="stat-val">${fmtMXN(inv)}</span></div>
-    <div class="stat-row"><span class="stat-key">Ingresos</span><span class="stat-val text-success">${fmtMXN(ing)}</span></div>
-    <div class="stat-row"><span class="stat-key">ROI</span><span class="stat-val" style="color:${color}">${roi}%</span></div>
-    ${cpl?`<div class="stat-row"><span class="stat-key">Costo por Lead</span><span class="stat-val">${fmtMXN(cpl)}</span></div>`:""}
-    ${cvr?`<div class="stat-row"><span class="stat-key">Tasa de Conversión</span><span class="stat-val">${cvr}%</span></div>`:""}
-    ${ctr?`<div class="stat-row"><span class="stat-key">CTR</span><span class="stat-val">${ctr}%</span></div>`:""}
-    ${alc?`<div class="stat-row"><span class="stat-key">Alcance</span><span class="stat-val">${alc.toLocaleString("es-MX")}</span></div>`:""}
-    <div class="divider"></div>
-    <button class="btn btn-secondary w-full" id="btn-copiar">${ico("copy")} Copiar reporte para cliente</button>`;
+    <div class="stat-row"><span class="stat-key">Ingresos (ventas registradas)</span><span class="stat-val text-success">${fmtMXN(ingresos)}</span></div>
+    <div class="stat-row"><span class="stat-key">ROI</span><span class="stat-val" style="color:${cls.color}">${roi}%</span></div>
+    ${leads?`<div class="stat-row"><span class="stat-key">Leads</span><span class="stat-val">${leads}</span></div>`:""}`;
 
-    document.getElementById("btn-copiar")?.addEventListener("click",()=>{
-      const txt=`📊 REPORTE BRAVO · ${nombre}\n\n🎯 ROAS: ${roas}x\n💰 Inversión: ${fmtMXN(inv)}\n✅ Ingresos generados: ${fmtMXN(ing)}\n📈 ROI: ${roi}%${cpl?`\n🎣 Costo por Lead: ${fmtMXN(cpl)}`:""}${cvr?`\n🔄 Tasa de conversión: ${cvr}%`:""}${ctr?`\n👆 CTR: ${ctr}%`:""}\n\n— Bravo Agency`;
-      navigator.clipboard.writeText(txt).then(()=>toast("Reporte copiado","success"));
-    });
+    btn.disabled=false; btn.innerHTML=`${ico("bar-chart")} Calcular`;
+    document.getElementById("btn-pub-roas").disabled=false;
   });
+
+  document.getElementById("btn-pub-roas").addEventListener("click", async()=>{
+    if(!resultadoActual){ toast("Primero calcula el ROAS","error"); return; }
+    const btn=document.getElementById("btn-pub-roas");
+    btn.disabled=true; btn.textContent="Publicando…";
+    try{
+      await addDoc(collection(db,"workspaces",wsId,"roas_reportes"),{
+        ...resultadoActual, creadoEn:serverTimestamp()
+      });
+      toast("✅ Reporte publicado al cliente","success");
+      resultadoActual=null;
+      secROAS(el);
+    }catch(e){ toast("Error al publicar","error"); btn.disabled=false; btn.innerHTML=`${ico("check")} Publicar al cliente`; }
+  });
+
+  window._delRoas=async(wid,rid)=>{
+    if(!confirm("¿Eliminar este reporte?")) return;
+    await deleteDoc(doc(db,"workspaces",wid,"roas_reportes",rid));
+    toast("Reporte eliminado","success"); secROAS(el);
+  };
 }
 
 // ─────────────────────────────────────────
@@ -1250,13 +1466,13 @@ async function secWorkspaces(el){
     ${S.workspaces.length===0
       ? `<div class="empty-state" style="grid-column:1/-1">${ico("briefcase")}<h3>Sin workspaces</h3><p>Crea el primero.</p></div>`
       : S.workspaces.map(w=>`
-      <div class="card">
+      <div class="card" id="ws-card-${w.id}">
         <div class="flex items-center gap-3 mb-4">
           ${w.logo?`<img src="${w.logo}" style="width:40px;height:40px;border-radius:8px;object-fit:cover" />`:`<div class="avatar avatar-lg" style="border-radius:8px">${initials(w.name)}</div>`}
           <div><div class="font-head font-800">${w.name}</div><div class="text-sm text-muted">${w.cliente||"Sin cliente"}</div></div>
         </div>
-        <div class="stat-row"><span class="stat-key">Meta mensual</span><span class="stat-val text-primary">${fmtMXN(w.metaMensual||0)}</span></div>
-        <div class="stat-row"><span class="stat-key">Industria</span><span class="stat-val">${w.industria||"—"}</span></div>
+        <div class="stat-row"><span class="stat-key">Total vendido</span><span class="stat-val text-primary" id="ws-total-${w.id}">…</span></div>
+        <div class="stat-row"><span class="stat-key">Más vendido</span><span class="stat-val truncate" style="max-width:160px" id="ws-top-${w.id}">…</span></div>
         <div class="flex gap-2 mt-4">
           <button class="btn btn-secondary btn-sm" onclick="window._editWs('${w.id}')">${ico("edit")} Editar</button>
           <button class="btn btn-ghost btn-sm" onclick="window._verDashWs('${w.id}')">${ico("eye")} Ver</button>
@@ -1273,6 +1489,22 @@ async function secWorkspaces(el){
     await deleteDoc(doc(db,"workspaces",id));
     toast("Eliminado","success"); renderSection("workspaces");
   };
+
+  // Cargar totales y producto top por workspace en paralelo
+  S.workspaces.forEach(async w=>{
+    try{
+      const snap=await getDocs(collection(db,"workspaces",w.id,"ventas"));
+      const ventas=snap.docs.map(d=>d.data());
+      const total=ventas.reduce((a,v)=>a+(v.monto||0),0);
+      const freq={};
+      ventas.forEach(v=>{ if(v.producto) freq[v.producto]=(freq[v.producto]||0)+1; });
+      const top=Object.entries(freq).sort((a,b)=>b[1]-a[1])[0]?.[0]||"—";
+      const elTotal=document.getElementById("ws-total-"+w.id);
+      const elTop=document.getElementById("ws-top-"+w.id);
+      if(elTotal) elTotal.textContent=fmtMXN(total);
+      if(elTop) elTop.textContent=top;
+    }catch(e){}
+  });
 }
 
 function openModalWs(ws,cb){
