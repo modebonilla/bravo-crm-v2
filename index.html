@@ -1109,6 +1109,8 @@ async function secRegistrarVenta(el){
               <option value="">Selecciona canal</option>
               <option value="facebook">Facebook</option>
               <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+              <option value="google">Google</option>
               <option value="referido">Referido</option>
               <option value="otro">Otro</option>
             </select>
@@ -2116,6 +2118,12 @@ function openViewer(p){
         : p.comentarioCliente
           ? `<div style="margin-top:12px;background:var(--surface-el);border-radius:var(--r);padding:12px;border-left:3px solid var(--primary)"><div class="text-sm text-muted" style="margin-bottom:4px">Comentario del cliente</div><div style="font-size:13px">${p.comentarioCliente}</div></div>`
           : ""}
+      ${isAdmin() ? `
+      <div class="divider"></div>
+      <div class="flex gap-2">
+        <button class="btn btn-secondary" style="flex:1" onclick="document.querySelector('.modal-overlay').remove();window._editPieza('${p.id}')">${ico("edit")} Editar pieza</button>
+        <button class="btn btn-danger btn-sm" onclick="if(confirm('¿Eliminar esta pieza?')){document.querySelector('.modal-overlay').remove();window._delPieza('${p.wsId}','${p.id}')}">${ico("trash")} Eliminar</button>
+      </div>` : ""}
     </div>
   </div>`;
   document.body.appendChild(ov);
