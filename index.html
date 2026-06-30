@@ -3213,18 +3213,46 @@ onAuthStateChanged(auth, async user=>{
   // Verificar si es parrilla pública
   if(await checkParrillaPublica()) return;
   if(!user){ S.user=null; S.profile=null; hideLoading(); render(); return; }
+
   S.user=user;
+  // Pantalla de carga con botón de reintento
+  document.getElementById("app").innerHTML=`
+    <div class="loading-screen" id="carga-screen">
+      <div style="text-align:center;max-width:300px;padding:24px">
+        <div class="logo-text" style="font-size:22px;margin-bottom:24px">BRAVO CRM</div>
+        <div class="spinner" style="margin:0 auto 20px"></div>
+        <p style="color:var(--text-muted);font-size:14px;margin-bottom:8px">Estamos cargando tu información…</p>
+        <p style="color:var(--text-muted);font-size:12px;margin-bottom:24px">Esto solo toma unos segundos</p>
+        <button id="btn-reintentar" class="btn btn-primary w-full" style="display:none" onclick="window.location.reload()">
+          ✓ Ya estoy listo — Entrar
+        </button>
+      </div>
+    </div>`;
+  // Mostrar botón de reintento después de 6 segundos
+  setTimeout(()=>{
+    const btn = document.getElementById("btn-reintentar");
+    if(btn) btn.style.display="flex";
+  }, 6000);
+
   try{
-    const pd=await getDoc(doc(db,"users",user.uid));
-    if(pd.exists()){ S.profile={id:pd.id,...pd.data()}; }
-    else{
+    // Perfil y config en paralelo
+    const [pdSnap, cdSnap] = await Promise.all([
+      getDoc(doc(db,"users",user.uid)),
+      getDoc(doc(db,"config","marca")).catch(()=>null)
+    ]);
+
+    if(pdSnap.exists()){
+      S.profile={id:pdSnap.id,...pdSnap.data()};
+    } else {
       const basic={email:user.email,role:"cliente",name:user.displayName||user.email,creadoEn:serverTimestamp()};
       await setDoc(doc(db,"users",user.uid),basic);
       S.profile={id:user.uid,...basic};
     }
-  }catch(e){ S.profile={id:user.uid,email:user.email,role:"cliente"}; }
 
-  try{
+    if(cdSnap?.exists()&&cdSnap.data()?.primary){
+      document.documentElement.style.setProperty("--primary",cdSnap.data().primary);
+    }
+
     if(isAdmin()){
       const snap=await getDocs(collection(db,"workspaces"));
       S.workspaces=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -3235,17 +3263,14 @@ onAuthStateChanged(auth, async user=>{
       if(wd.exists()){ S.workspaces=[{id:wd.id,...wd.data()}]; S.currentWorkspace=S.workspaces[0]; }
       S.section="dashboard";
     }
-  }catch(e){ console.error("Error workspaces",e); }
+  }catch(e){
+    console.error("Error iniciando:",e);
+    if(!S.profile) S.profile={id:user.uid,email:user.email,role:"cliente"};
+  }
 
-  try{
-    const cd=await getDoc(doc(db,"config","marca"));
-    if(cd.exists()&&cd.data().primary) document.documentElement.style.setProperty("--primary",cd.data().primary);
-  }catch(e){}
+  hideLoading();
+  render();
 
-  hideLoading(); render();
-  // Cargar notificaciones de contenidos para admin
-  if(S.profile?.role==="admin") setTimeout(cargarNotifContenidos, 1500);
-});
 
 async function cargarNotifContenidos(){
   try{
