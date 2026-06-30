@@ -340,10 +340,19 @@ function toast(msg, type="success"){
 const showLoading = () => document.getElementById("loading-screen").style.display = "flex";
 const hideLoading = () => document.getElementById("loading-screen").style.display = "none";
 
-function canalBadge(c=""){
-  const map = {facebook:"badge-fb",instagram:"badge-ig",whatsapp:"badge-wa",referido:"badge-muted",otro:"badge-muted"};
-  const cls = map[c.toLowerCase()]||"badge-muted";
-  return `<span class="badge ${cls}">${c.charAt(0).toUpperCase()+c.slice(1)||"—"}</span>`;
+function canalBadge(c="", otroCual=""){
+  const rl=(c||"").toLowerCase();
+  const map={
+    facebook:{cls:"badge-fb",icon:"f"},
+    instagram:{cls:"badge-ig",icon:"ig"},
+    tiktok:{cls:"",icon:"tt",style:"background:#00f2ea26;color:#00f2ea"},
+    google:{cls:"",icon:"g",style:"background:#ea433526;color:#ea4335"},
+    referido:{cls:"badge-muted",icon:"ref"},
+    otro:{cls:"badge-muted",icon:"otro"},
+  };
+  const d=map[rl]||{cls:"badge-muted",icon:c};
+  const label=rl==="otro"&&otroCual ? `Otro: ${otroCual}` : (c.charAt(0).toUpperCase()+c.slice(1)||"—");
+  return `<span class="badge ${d.cls}" ${d.style?`style="${d.style}"`:""}>${label}</span>`;
 }
 function rolBadge(r){
   return r==="admin"
@@ -479,7 +488,7 @@ function renderShell(){
   const navAdmin = isAdmin() ? `
     <div class="nav-label">Agencia</div>
     <button class="nav-item ${sec==="panel-agencia"?"active":""}" data-section="panel-agencia">${ico("grid")} Panel de Agencia</button>
-    <button class="nav-item ${sec==="contenidos"?"active":""}" data-section="contenidos">${ico("calendar")} Contenidos</button>
+    <button class="nav-item ${sec==="contenidos"?"active":""}" data-section="contenidos">${ico("calendar")} Contenidos <span id="notif-badge" style="display:none;background:var(--error);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;margin-left:auto">!</span></button>
     <div class="nav-label">Administración</div>
     <button class="nav-item ${sec==="workspaces"?"active":""}" data-section="workspaces">${ico("briefcase")} Workspaces</button>
     <button class="nav-item ${sec==="usuarios"?"active":""}" data-section="usuarios">${ico("users")} Usuarios</button>
@@ -491,7 +500,7 @@ function renderShell(){
     <button class="nav-item ${sec==="registrar-venta"?"active":""}" data-section="registrar-venta">${ico("plus-circle")} Registrar Venta</button>
     <button class="nav-item ${sec==="mis-ventas"?"active":""}" data-section="mis-ventas">${ico("dollar")} Mis Ventas</button>
     <button class="nav-item ${sec==="roas"?"active":""}" data-section="roas">${ico("bar-chart")} ROAS Calculator</button>
-    <button class="nav-item ${sec==="contenidos"?"active":""}" data-section="contenidos">${ico("calendar")} Contenidos</button>
+    <button class="nav-item ${sec==="contenidos"?"active":""}" data-section="contenidos">${ico("calendar")} Contenidos <span id="notif-badge" style="display:none;background:var(--error);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:100px;margin-left:auto">!</span></button>
   `;
 
   // Topbar derecha: si admin, mostrar selector de workspace
@@ -955,6 +964,10 @@ async function secRegistrarVenta(el){
     </div>
   </div>`;
 
+  document.getElementById("v-canal")?.addEventListener("change",e=>{
+    const g=document.getElementById("otro-cual-group");
+    if(g) g.style.display=e.target.value==="otro"?"flex":"none";
+  });
   document.getElementById("btn-guardar")?.addEventListener("click", async()=>{
     const canal    = document.getElementById("v-canal").value;
     const producto = document.getElementById("v-producto").value.trim();
@@ -966,6 +979,7 @@ async function secRegistrarVenta(el){
     try{
       await addDoc(collection(db,"workspaces",wsId,"ventas"),{
         canal, producto, monto,
+        otroCual: canal==="otro" ? (document.getElementById("v-otro-cual")?.value||"") : "",
         campana:  document.getElementById("v-campana").value||"",
         cliente:  document.getElementById("v-cliente").value||"",
         whatsapp: document.getElementById("v-wa").value||"",
@@ -999,23 +1013,112 @@ async function secRegistrarVenta(el){
 async function secMisVentas(el){
   const wsId = getWsId();
   if(!wsId){ el.innerHTML=emptyWs(); return; }
-  const snap = await getDocs(query(
-    collection(db,"workspaces",wsId,"ventas"),
-    where("vendedorId","==",S.user.uid),
-    orderBy("fecha","desc")
-  ));
-  const ventas = snap.docs.map(d=>({id:d.id,...d.data()}));
-  const total = ventas.reduce((a,v)=>a+(v.monto||0),0);
 
-  el.innerHTML = `
+  el.innerHTML=`<div class="section-loading"><div class="spinner"></div></div>`;
+
+  let ventas=[];
+  try{
+    const snap=await getDocs(query(
+      collection(db,"workspaces",wsId,"ventas"),
+      where("vendedorId","==",S.user.uid),
+      orderBy("fecha","desc")
+    ));
+    ventas=snap.docs.map(d=>({id:d.id,...d.data(),wsId}));
+  }catch(e){ el.innerHTML=`<div class="empty-state"><h3>Error cargando ventas</h3><p>${e.message}</p></div>`; return; }
+
+  let fCanal="",fDesde="",fHasta="",fProducto="",fCampana="";
+
+  function filtered(){
+    return ventas.filter(v=>{
+      if(fCanal && (v.canal||"").toLowerCase()!==fCanal) return false;
+      if(fProducto && !(v.producto||"").toLowerCase().includes(fProducto.toLowerCase())) return false;
+      if(fCampana && !(v.campana||"").toLowerCase().includes(fCampana.toLowerCase())) return false;
+      if(fDesde){ const d=v.fecha?.toDate?.()||new Date(0); if(d<new Date(fDesde)) return false; }
+      if(fHasta){ const d=v.fecha?.toDate?.()||new Date(0); if(d>new Date(fHasta+"T23:59:59")) return false; }
+      return true;
+    });
+  }
+
+  function refresh(){
+    const f=filtered();
+    const t=f.reduce((a,v)=>a+(v.monto||0),0);
+    document.getElementById("mv-count").innerHTML=`${f.length} registros · <span class="text-primary">${fmtMXN(t)}</span>`;
+    document.getElementById("mv-tbody").innerHTML=f.length===0
+      ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted)">Sin resultados</td></tr>`
+      : f.map(v=>`<tr>
+          <td>${canalBadge(v.canal||"",v.otroCual||"")}</td>
+          <td>${v.campana||"—"}</td>
+          <td class="truncate" style="max-width:140px">${v.producto||"—"}</td>
+          <td class="font-bold text-primary">${fmtMXN(v.monto)}</td>
+          <td>${v.cliente||"—"}</td>
+          <td>${fmtDate(v.fecha)}</td>
+          <td><div class="flex gap-1">
+            <button class="btn-icon" onclick="window._editMiVenta('${v.id}')">${ico("edit")}</button>
+            <button class="btn-icon" onclick="window._delMiVenta('${v.id}')">${ico("trash")}</button>
+          </div></td>
+        </tr>`).join("");
+  }
+
+  el.innerHTML=`
   <div class="page-header">
     <div><div class="page-title">Mis Ventas</div>
-    <div class="page-subtitle">${ventas.length} registros · Total: <span class="text-primary">${fmtMXN(total)}</span></div></div>
+    <div class="page-subtitle" id="mv-count"></div></div>
     <button class="btn btn-primary" id="btn-nueva">${ico("plus")} Nueva Venta</button>
   </div>
-  ${ventasTable(ventas,false)}`;
+  <div class="filters-bar">
+    <div class="form-group">
+      <label class="form-label">Canal</label>
+      <select class="form-select" id="mv-canal">
+        <option value="">Todos</option>
+        <option value="facebook">Facebook</option>
+        <option value="instagram">Instagram</option>
+        <option value="tiktok">TikTok</option>
+        <option value="google">Google</option>
+        <option value="referido">Referido</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Producto / Servicio</label>
+      <input class="form-input" id="mv-producto" placeholder="Buscar…" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Campaña</label>
+      <input class="form-input" id="mv-campana" placeholder="Buscar…" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Desde</label>
+      <input class="form-input" id="mv-desde" type="date" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Hasta</label>
+      <input class="form-input" id="mv-hasta" type="date" />
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Canal</th><th>Campaña</th><th>Producto</th><th>Monto</th><th>Cliente</th><th>Fecha</th><th></th></tr></thead>
+      <tbody id="mv-tbody"></tbody>
+    </table>
+  </div>`;
 
-  document.getElementById("btn-nueva")?.addEventListener("click",()=>{ S.section="registrar-venta"; updateNav(); renderSection("registrar-venta"); });
+  refresh();
+  document.getElementById("mv-canal").addEventListener("change",e=>{fCanal=e.target.value;refresh();});
+  document.getElementById("mv-producto").addEventListener("input",e=>{fProducto=e.target.value;refresh();});
+  document.getElementById("mv-campana").addEventListener("input",e=>{fCampana=e.target.value;refresh();});
+  document.getElementById("mv-desde").addEventListener("change",e=>{fDesde=e.target.value;refresh();});
+  document.getElementById("mv-hasta").addEventListener("change",e=>{fHasta=e.target.value;refresh();});
+  document.getElementById("btn-nueva").addEventListener("click",()=>{ S.section="registrar-venta"; updateNav(); renderSection("registrar-venta"); });
+
+  window._editMiVenta=(vid)=>{
+    const v=ventas.find(x=>x.id===vid);
+    if(v) openModalEditVenta({...v,wsId},()=>secMisVentas(el));
+  };
+  window._delMiVenta=async(vid)=>{
+    if(!confirm("¿Eliminar esta venta?")) return;
+    await deleteDoc(doc(db,"workspaces",wsId,"ventas",vid));
+    toast("Venta eliminada","success"); secMisVentas(el);
+  };
 }
 
 // ─────────────────────────────────────────
@@ -1023,48 +1126,61 @@ async function secMisVentas(el){
 // ─────────────────────────────────────────
 async function secTodasVentas(el){
   if(!isAdmin()){ el.innerHTML=`<div class="empty-state"><h3>Acceso restringido</h3></div>`; return; }
-  const wsId = getWsId();
-  if(!wsId){ el.innerHTML=emptyWs(); return; }
 
-  const snap = await getDocs(query(collection(db,"workspaces",wsId,"ventas"),orderBy("fecha","desc")));
-  let ventas = snap.docs.map(d=>({id:d.id,...d.data()}));
+  el.innerHTML=`<div class="section-loading"><div class="spinner"></div></div>`;
 
-  let fCanal="", fFechaD="", fFechaH="";
+  // Cargar ventas de TODOS los workspaces
+  let todasVentas=[];
+  for(const ws of S.workspaces){
+    try{
+      const snap=await getDocs(query(collection(db,"workspaces",ws.id,"ventas"),orderBy("fecha","desc")));
+      const vv=snap.docs.map(d=>({id:d.id,...d.data(),wsId:ws.id,wsName:ws.name}));
+      todasVentas=[...todasVentas,...vv];
+    }catch(e){}
+  }
+  todasVentas.sort((a,b)=>{
+    const da=a.fecha?.toDate?.()||new Date(0);
+    const db2=b.fecha?.toDate?.()||new Date(0);
+    return db2-da;
+  });
+
+  let fWs="",fCanal="",fDesde="",fHasta="",fProducto="",fCampana="";
 
   function filtered(){
-    return ventas.filter(v=>{
-      if(fCanal && v.canal?.toLowerCase()!==fCanal) return false;
-      if(fFechaD){
-        const d = v.fecha?.toDate?.()||new Date(v.fecha||0);
-        if(d < new Date(fFechaD)) return false;
-      }
-      if(fFechaH){
-        const d = v.fecha?.toDate?.()||new Date(v.fecha||0);
-        if(d > new Date(fFechaH+"T23:59:59")) return false;
-      }
+    return todasVentas.filter(v=>{
+      if(fWs && v.wsId!==fWs) return false;
+      if(fCanal && (v.canal||"").toLowerCase()!==fCanal) return false;
+      if(fProducto && !(v.producto||"").toLowerCase().includes(fProducto.toLowerCase())) return false;
+      if(fCampana && !(v.campana||"").toLowerCase().includes(fCampana.toLowerCase())) return false;
+      if(fDesde){ const d=v.fecha?.toDate?.()||new Date(0); if(d<new Date(fDesde)) return false; }
+      if(fHasta){ const d=v.fecha?.toDate?.()||new Date(0); if(d>new Date(fHasta+"T23:59:59")) return false; }
       return true;
     });
   }
 
   function refresh(){
-    const f = filtered();
-    const t = f.reduce((a,v)=>a+(v.monto||0),0);
-    document.getElementById("tv-count").innerHTML = `${f.length} registros · <span class="text-primary">${fmtMXN(t)}</span>`;
-    document.getElementById("tv-tbody").innerHTML = f.length===0
-      ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted)">Sin resultados</td></tr>`
+    const f=filtered();
+    const t=f.reduce((a,v)=>a+(v.monto||0),0);
+    document.getElementById("tv-count").innerHTML=`${f.length} registros · <span class="text-primary">${fmtMXN(t)}</span>`;
+    document.getElementById("tv-tbody").innerHTML=f.length===0
+      ? `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)">Sin resultados</td></tr>`
       : f.map(v=>`<tr>
-          <td>${canalBadge(v.canal||"")}</td>
+          <td><span class="chip" style="font-size:11px">${v.wsName||"—"}</span></td>
+          <td>${canalBadge(v.canal||"",v.otroCual||"")}</td>
           <td>${v.campana||"—"}</td>
-          <td>${v.producto||"—"}</td>
+          <td class="truncate" style="max-width:140px">${v.producto||"—"}</td>
           <td class="font-bold text-primary">${fmtMXN(v.monto)}</td>
           <td>${v.cliente||"—"}</td>
           <td>${v.vendedorEmail||"—"}</td>
           <td>${fmtDate(v.fecha)}</td>
-          <td><button class="btn-icon" onclick="window._delVenta('${wsId}','${v.id}')">${ico("trash")}</button></td>
+          <td><div class="flex gap-1">
+            <button class="btn-icon" onclick="window._editVenta('${v.wsId}','${v.id}')">${ico("edit")}</button>
+            <button class="btn-icon" onclick="window._delVenta('${v.wsId}','${v.id}')">${ico("trash")}</button>
+          </div></td>
         </tr>`).join("");
   }
 
-  el.innerHTML = `
+  el.innerHTML=`
   <div class="page-header">
     <div><div class="page-title">Todas las Ventas</div>
     <div class="page-subtitle" id="tv-count"></div></div>
@@ -1072,15 +1188,25 @@ async function secTodasVentas(el){
   </div>
   <div class="filters-bar">
     <div class="form-group">
+      <label class="form-label">Cliente / Workspace</label>
+      <select class="form-select" id="f-ws">
+        <option value="">Todos</option>
+        ${S.workspaces.map(w=>`<option value="${w.id}">${w.name}</option>`).join("")}
+      </select>
+    </div>
+    <div class="form-group">
       <label class="form-label">Canal</label>
       <select class="form-select" id="f-canal">
-        <option value="">Todos</option>
-        <option value="facebook">Facebook</option>
-        <option value="instagram">Instagram</option>
-        <option value="whatsapp">WhatsApp</option>
-        <option value="referido">Referido</option>
-        <option value="otro">Otro</option>
+        ${CANAL_OPTIONS_ALL}
       </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Producto / Servicio</label>
+      <input class="form-input" id="f-producto" placeholder="Buscar…" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Campaña</label>
+      <input class="form-input" id="f-campana" placeholder="Buscar…" />
     </div>
     <div class="form-group">
       <label class="form-label">Desde</label>
@@ -1093,22 +1219,109 @@ async function secTodasVentas(el){
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Canal</th><th>Campaña</th><th>Producto</th><th>Monto</th><th>Cliente</th><th>Vendedor</th><th>Fecha</th><th></th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Canal</th><th>Campaña</th><th>Producto</th><th>Monto</th><th>Cliente final</th><th>Vendedor</th><th>Fecha</th><th></th></tr></thead>
       <tbody id="tv-tbody"></tbody>
     </table>
   </div>`;
 
+  // Inyectar CANAL_OPTIONS_ALL
+  document.getElementById("f-canal").innerHTML=`<option value="">Todos</option>
+    <option value="facebook">Facebook</option>
+    <option value="instagram">Instagram</option>
+    <option value="tiktok">TikTok</option>
+    <option value="google">Google</option>
+    <option value="referido">Referido</option>
+    <option value="otro">Otro</option>`;
+
   refresh();
+  document.getElementById("f-ws").addEventListener("change",e=>{fWs=e.target.value;refresh();});
   document.getElementById("f-canal").addEventListener("change",e=>{fCanal=e.target.value;refresh();});
-  document.getElementById("f-desde").addEventListener("change",e=>{fFechaD=e.target.value;refresh();});
-  document.getElementById("f-hasta").addEventListener("change",e=>{fFechaH=e.target.value;refresh();});
+  document.getElementById("f-producto").addEventListener("input",e=>{fProducto=e.target.value;refresh();});
+  document.getElementById("f-campana").addEventListener("input",e=>{fCampana=e.target.value;refresh();});
+  document.getElementById("f-desde").addEventListener("change",e=>{fDesde=e.target.value;refresh();});
+  document.getElementById("f-hasta").addEventListener("change",e=>{fHasta=e.target.value;refresh();});
   document.getElementById("btn-csv").addEventListener("click",()=>exportCSV(filtered()));
 
-  window._delVenta = async(wid,vid)=>{
+  window._delVenta=async(wid,vid)=>{
     if(!confirm("¿Eliminar esta venta?")) return;
     await deleteDoc(doc(db,"workspaces",wid,"ventas",vid));
-    toast("Venta eliminada","success");
-    renderSection("todas-ventas");
+    toast("Venta eliminada","success"); secTodasVentas(el);
+  };
+
+  window._editVenta=async(wid,vid)=>{
+    const v=todasVentas.find(x=>x.id===vid&&x.wsId===wid);
+    if(!v) return;
+    openModalEditVenta(v,()=>secTodasVentas(el));
+  };
+}
+
+function openModalEditVenta(v, cb){
+  const ov=document.createElement("div"); ov.className="modal-overlay";
+  ov.innerHTML=`<div class="modal">
+    <div class="modal-header"><div class="modal-title">Editar Venta</div><button class="btn-icon" id="ev-close">${ico("x")}</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Canal</label>
+          <select class="form-select" id="ev-canal">
+            <option value="facebook" ${v.canal==="facebook"?"selected":""}>Facebook</option>
+            <option value="instagram" ${v.canal==="instagram"?"selected":""}>Instagram</option>
+            <option value="tiktok" ${v.canal==="tiktok"?"selected":""}>TikTok</option>
+            <option value="google" ${v.canal==="google"?"selected":""}>Google</option>
+            <option value="referido" ${v.canal==="referido"?"selected":""}>Referido</option>
+            <option value="otro" ${v.canal==="otro"?"selected":""}>Otro</option>
+          </select></div>
+        <div class="form-group"><label class="form-label">¿Cuál? (si es Otro)</label>
+          <input class="form-input" id="ev-otro" value="${v.otroCual||""}" placeholder="ej. LinkedIn" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Producto / Servicio</label>
+          <input class="form-input" id="ev-producto" value="${v.producto||""}" /></div>
+        <div class="form-group"><label class="form-label">Monto (MXN)</label>
+          <input class="form-input" id="ev-monto" type="number" value="${v.monto||0}" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Campaña</label>
+          <input class="form-input" id="ev-campana" value="${v.campana||""}" /></div>
+        <div class="form-group"><label class="form-label">Fecha</label>
+          <input class="form-input" id="ev-fecha" type="date" value="${v.fecha?.toDate?(v.fecha.toDate().toISOString().slice(0,10)):"" }" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Cliente</label>
+          <input class="form-input" id="ev-cliente" value="${v.cliente||""}" /></div>
+        <div class="form-group"><label class="form-label">WhatsApp</label>
+          <input class="form-input" id="ev-wa" value="${v.whatsapp||""}" /></div>
+      </div>
+      <div class="form-group"><label class="form-label">Notas</label>
+        <textarea class="form-textarea" id="ev-notas">${v.notas||""}</textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="ev-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="ev-save">${ico("check")} Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  document.getElementById("ev-close").onclick=close;
+  document.getElementById("ev-cancel").onclick=close;
+  ov.addEventListener("click",e=>{ if(e.target===ov) close(); });
+  document.getElementById("ev-save").onclick=async()=>{
+    const btn=document.getElementById("ev-save"); btn.disabled=true; btn.textContent="Guardando…";
+    const canal=document.getElementById("ev-canal").value;
+    const fechaStr=document.getElementById("ev-fecha").value;
+    try{
+      await updateDoc(doc(db,"workspaces",v.wsId,"ventas",v.id),{
+        canal, otroCual:canal==="otro"?document.getElementById("ev-otro").value:"",
+        producto:document.getElementById("ev-producto").value,
+        monto:parseFloat(document.getElementById("ev-monto").value||0),
+        campana:document.getElementById("ev-campana").value,
+        cliente:document.getElementById("ev-cliente").value,
+        whatsapp:document.getElementById("ev-wa").value,
+        notas:document.getElementById("ev-notas").value,
+        fecha:fechaStr?Timestamp.fromDate(new Date(fechaStr+"T12:00:00")):v.fecha,
+        updatedAt:serverTimestamp()
+      });
+      toast("Venta actualizada","success"); close(); cb&&cb();
+    }catch(e){ toast("Error","error"); btn.disabled=false; btn.textContent="Guardar"; }
   };
 }
 
@@ -1391,9 +1604,17 @@ function formatoBadge(f){
   const color=map[f]||"#606060";
   return `<span style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:.5px;text-transform:uppercase">${f||"Post"}</span>`;
 }
-function redIcon(r){
-  const map={instagram:"IG",facebook:"FB",whatsapp:"WA",youtube:"YT"};
-  return `<span class="badge badge-muted" style="font-size:10px">${map[r?.toLowerCase()]||r||"—"}</span>`;
+function redIcon(r, full=false){
+  const rl=(r||"").toLowerCase();
+  const map={
+    instagram:{label:"Instagram",color:"#e1306c",bg:"#e1306c26",icon:"📷"},
+    facebook:{label:"Facebook",color:"#1877f2",bg:"#1877f226",icon:"👍"},
+    whatsapp:{label:"WhatsApp",color:"#25d366",bg:"#25d36626",icon:"💬"},
+    youtube:{label:"YouTube",color:"#ff0000",bg:"#ff000026",icon:"▶️"},
+  };
+  const d=map[rl]||{label:r||"—",color:"#606060",bg:"#60606026",icon:"🌐"};
+  if(full) return `<span style="background:${d.bg};color:${d.color};font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;display:inline-flex;align-items:center;gap:4px">${d.icon} ${d.label}</span>`;
+  return `<span style="background:${d.bg};color:${d.color};font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px">${d.icon}</span>`;
 }
 function statusColor(s){
   return s==="aprobado"?"#22c55e":s==="rechazado"?"#ef4444":s==="publicado"?"#3b82f6":"#f59e0b";
@@ -1429,19 +1650,40 @@ function openViewer(p){
   ov.innerHTML=`<div style="background:var(--surface);border-radius:var(--r-lg);max-width:420px;width:100%;max-height:92vh;overflow-y:auto;border:1px solid var(--border)">
     <div class="modal-header">
       <div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">${formatoBadge(p.tipo)} ${redIcon(p.red)}</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">${formatoBadge(p.tipo)} ${redIcon(p.red,true)}</div>
         <div class="font-head font-800" style="font-size:15px">${p.titulo||p.descripcion||"Sin título"}</div>
         <div class="text-sm text-muted">${p.fecha||p.dia||""} ${p.hora?"· "+p.hora:""}</div>
       </div>
       <button class="btn-icon" id="vw-close">${ico("x")}</button>
     </div>
     <div style="padding:0 16px">
-      ${p.mediaUrl
-        ? isVideo
-          ? `<video src="${p.mediaUrl}" style="width:100%;aspect-ratio:${ratio};object-fit:cover;border-radius:8px" controls></video>`
-          : `<img src="${p.mediaUrl}" style="width:100%;aspect-ratio:${ratio};object-fit:cover;border-radius:8px" />`
-        : `<div style="width:100%;aspect-ratio:${ratio};background:var(--surface-el);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-muted)">Sin archivo</div>`
-      }
+      ${(()=>{
+        const allMedia = (p.mediaUrls&&p.mediaUrls.length>1) ? p.mediaUrls : (p.mediaUrl?[{url:p.mediaUrl,type:p.mediaType}]:[]);
+        if(!allMedia.length){
+          if(p.tipo==="Pendiente") return `<div style="width:100%;aspect-ratio:${ratio};background:#f59e0b11;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--warning);gap:8px"><div style="font-size:32px">📋</div><div style="font-weight:700">Contenido pendiente por subir</div><div style="font-size:12px;color:var(--text-muted)">${p.descripcion||""}</div></div>`;
+          return `<div style="width:100%;aspect-ratio:${ratio};background:var(--surface-el);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-muted)">Sin archivo</div>`;
+        }
+        if(allMedia.length===1){
+          const m=allMedia[0];
+          return m.type==="video"
+            ? `<video src="${m.url}" style="width:100%;aspect-ratio:${ratio};object-fit:cover;border-radius:8px" controls></video>`
+            : `<img src="${m.url}" style="width:100%;aspect-ratio:${ratio};object-fit:cover;border-radius:8px" />`;
+        }
+        // Carrusel deslizable
+        const id="car-"+Math.random().toString(36).slice(2,7);
+        return `<div id="${id}" style="position:relative;overflow:hidden;border-radius:8px">
+          <div id="${id}-track" style="display:flex;transition:transform .3s ease">
+            ${allMedia.map(m=>m.type==="video"
+              ? `<div style="flex:0 0 100%"><video src="${m.url}" style="width:100%;aspect-ratio:${ratio};object-fit:cover" controls></video></div>`
+              : `<div style="flex:0 0 100%"><img src="${m.url}" style="width:100%;aspect-ratio:${ratio};object-fit:cover" /></div>`).join("")}
+          </div>
+          <button onclick="(function(){var t=document.getElementById('${id}-track');var i=parseInt(t.dataset.idx||0);i=Math.max(0,i-1);t.dataset.idx=i;t.style.transform='translateX(-'+i*100+'%)'})()" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:#000a;border:none;color:#fff;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:16px">‹</button>
+          <button onclick="(function(){var t=document.getElementById('${id}-track');var i=parseInt(t.dataset.idx||0);i=Math.min(${allMedia.length-1},i+1);t.dataset.idx=i;t.style.transform='translateX(-'+i*100+'%)'})()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#000a;border:none;color:#fff;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:16px">›</button>
+          <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
+            ${allMedia.map((_,i)=>`<div style="width:6px;height:6px;border-radius:50%;background:#fff${i===0?"":"8"}"></div>`).join("")}
+          </div>
+        </div>`;
+      })()}
     </div>
     <div style="padding:16px">
       <div class="stat-row"><span class="stat-key">Estado</span><span style="color:${statusColor(p.status)};font-weight:700">${statusLabel(p.status)}</span></div>
@@ -1477,63 +1719,60 @@ window._accionPieza=async(wid,pid,status,comentario)=>{
 };
 
 async function secContenidos(el){
+  // Limpiar badge al entrar
+  const badge=document.getElementById("notif-badge");
+  if(badge) badge.style.display="none";
   const wsId = getWsId();
   if(!wsId){ el.innerHTML=emptyWs(); return; }
 
   const now = new Date();
   let mesActual = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
-  let mesLabel = now.toLocaleDateString("es-MX",{month:"long",year:"numeric"});
+
+  function getMesLabel(mes){
+    const [y,m]=mes.split("-").map(Number);
+    return new Date(y,m-1,1).toLocaleDateString("es-MX",{month:"long",year:"numeric"});
+  }
+  function navMes(mes,delta){
+    const [y,m]=mes.split("-").map(Number);
+    const d=new Date(y,m-1+delta,1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  }
 
   async function cargarYRenderizar(mes){
     el.innerHTML=`<div class="section-loading"><div class="spinner"></div></div>`;
-    const snap = await getDocs(query(
-      collection(db,"workspaces",wsId,"contenidos"),
-      where("mes","==",mes)
-    ));
+    const snap = await getDocs(query(collection(db,"workspaces",wsId,"contenidos"),where("mes","==",mes)));
     const piezas = snap.docs.map(d=>({id:d.id,...d.data(),wsId}));
-    // Ordenar por fecha y hora
     piezas.sort((a,b)=>{
       const da=new Date((a.fecha||"2000-01-01")+"T"+(a.hora||"00:00"));
       const db2=new Date((b.fecha||"2000-01-01")+"T"+(b.hora||"00:00"));
       return da-db2;
     });
 
-    // Agrupar por fecha
     const porFecha={};
-    piezas.forEach(p=>{
-      const key=p.fecha||"Sin fecha";
-      if(!porFecha[key]) porFecha[key]=[];
-      porFecha[key].push(p);
-    });
+    piezas.forEach(p=>{ const k=p.fecha||"Sin fecha"; if(!porFecha[k]) porFecha[k]=[]; porFecha[k].push(p); });
 
     const totalAprobados=piezas.filter(p=>p.status==="aprobado").length;
     const totalComentarios=piezas.filter(p=>p.comentarioCliente).length;
     const totalPendientes=piezas.filter(p=>p.status==="pendiente"||p.status==="revision").length;
-
-    // Meses disponibles para navegar
-    const meses=[];
-    for(let i=-2;i<=2;i++){
-      const d=new Date(now.getFullYear(),now.getMonth()+i,1);
-      meses.push({val:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,
-        label:d.toLocaleDateString("es-MX",{month:"long",year:"numeric"})});
-    }
+    const mesLabel=getMesLabel(mes).charAt(0).toUpperCase()+getMesLabel(mes).slice(1);
 
     el.innerHTML=`
     <div class="page-header">
       <div>
         <div class="page-title">Parrilla de contenidos</div>
-        <div class="text-primary font-head font-800" style="font-size:18px;margin-top:2px">${mesLabel.charAt(0).toUpperCase()+mesLabel.slice(1)}</div>
+        <div class="text-primary font-head font-800" style="font-size:18px;margin-top:2px">${mesLabel}</div>
         ${!isAdmin()?`<div class="text-sm text-muted mt-1">Revisa cada contenido, deja tus comentarios y aprueba o solicita cambios.</div>`:""}
       </div>
       <div class="flex gap-2 items-center flex-wrap">
-        <select class="form-select" id="mes-selector" style="max-width:180px">
-          ${meses.map(m=>`<option value="${m.val}" ${m.val===mes?"selected":""}>${m.label}</option>`).join("")}
-        </select>
+        <div class="flex items-center gap-1">
+          <button class="btn-icon" id="btn-mes-prev" title="Mes anterior">◀</button>
+          <span style="font-size:13px;font-weight:600;min-width:120px;text-align:center">${mesLabel}</span>
+          <button class="btn-icon" id="btn-mes-next" title="Mes siguiente">▶</button>
+        </div>
         ${isAdmin()?`<button class="btn btn-primary" id="btn-nueva-pieza">${ico("plus")} Agregar pieza</button>`:""}
       </div>
     </div>
 
-    <!-- Métricas -->
     <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
       <div class="metric-card"><div class="metric-label">Total</div><div class="metric-value">${piezas.length}</div></div>
       <div class="metric-card"><div class="metric-label">Aprobados</div><div class="metric-value" style="color:var(--success)">${totalAprobados}</div></div>
@@ -1541,155 +1780,127 @@ async function secContenidos(el){
       <div class="metric-card"><div class="metric-label">Pendientes</div><div class="metric-value" style="color:var(--text-muted)">${totalPendientes}</div></div>
     </div>
 
-    <!-- Tabs vista -->
+    ${isAdmin()?`
     <div class="tabs" id="vista-tabs" style="margin-bottom:16px">
       <button class="tab active" data-vista="calendario">📅 Calendario</button>
       <button class="tab" data-vista="lista">☰ Lista</button>
-    </div>
+    </div>`:""}
 
-    <!-- Parrilla -->
-    <div id="parrilla-content">
-      <!-- renderizado por JS -->
-    </div>`;
+    <div id="parrilla-content"><!-- JS --></div>`;
 
-    // Guardar piezas en scope para acceso desde handlers
     window._piezasActuales = piezas;
 
-    // ── RENDER CALENDARIO ──
+    // ── RENDER LISTA ──
+    function renderLista(){
+      if(Object.keys(porFecha).length===0){
+        document.getElementById("parrilla-content").innerHTML=`<div class="empty-state">${ico("calendar")}<h3>${isAdmin()?"Sin contenidos este mes":"Pendiente de publicar por la agencia"}</h3><p>${isAdmin()?"Agrega la primera pieza con el botón de arriba.":"Tu programación de contenidos aparecerá aquí cuando esté lista."}</p></div>`;
+        return;
+      }
+      document.getElementById("parrilla-content").innerHTML=Object.entries(porFecha).map(([fecha,pzs])=>{
+        const fechaLabel=fecha!=="Sin fecha"
+          ? new Date(fecha+"T12:00:00").toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"})
+          : "Sin fecha asignada";
+        return `<div style="margin-bottom:32px">
+          <div style="font-family:var(--font-head);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:16px">${fechaLabel}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+            ${pzs.map(p=>`
+            <div class="card" style="padding:0;overflow:hidden;cursor:pointer;transition:all var(--tr);border-color:${p.status==="aprobado"?"var(--success)":p.status==="rechazado"?"var(--error)":"var(--border)"}" onclick="window._abrirPieza('${p.id}')">
+              <div style="position:relative">
+                ${renderThumbnail(p)}
+                <div style="position:absolute;top:8px;left:8px">${formatoBadge(p.tipo)}</div>
+                <div style="position:absolute;top:8px;right:8px">${redIcon(p.red)}</div>
+              </div>
+              <div style="padding:12px">
+                ${p.hora?`<div class="text-sm text-muted" style="margin-bottom:4px">${p.hora}</div>`:""}
+                <div style="font-weight:700;font-size:13px;margin-bottom:4px;line-height:1.3">${p.titulo||p.descripcion||"Sin título"}</div>
+                ${p.descripcion&&p.titulo?`<div class="text-sm text-muted truncate">${p.descripcion}</div>`:""}
+                <div style="margin-top:8px">${redIcon(p.red,true)}</div>
+                <div style="margin-top:8px;font-size:11px;font-weight:700;color:${statusColor(p.status)}">${statusLabel(p.status)}</div>
+                ${p.comentarioCliente?`<div style="margin-top:6px;font-size:11px;color:var(--warning);background:var(--surface-el);border-radius:4px;padding:4px 8px">💬 ${p.comentarioCliente.slice(0,40)}${p.comentarioCliente.length>40?"…":""}</div>`:""}
+              </div>
+              ${isAdmin()?`<div style="padding:0 12px 12px;display:flex;gap:6px" onclick="event.stopPropagation()">
+                <button class="btn-icon" style="flex:1;justify-content:center" onclick="window._editPieza('${p.id}')">${ico("edit")}</button>
+                <button class="btn-icon" onclick="window._delPieza('${wsId}','${p.id}')">${ico("trash")}</button>
+              </div>`:""}
+            </div>`).join("")}
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    // ── RENDER CALENDARIO (solo admin) ──
     function renderCalendario(){
-      const [year, month] = mes.split("-").map(Number);
-      const primerDia = new Date(year, month-1, 1);
-      const ultimoDia = new Date(year, month, 0);
-      const diasEnMes = ultimoDia.getDate();
-      // Empezar semana en lunes (0=lunes...6=domingo)
-      let startDow = primerDia.getDay(); // 0=dom
-      startDow = startDow === 0 ? 6 : startDow - 1; // convertir a lunes=0
-
-      const hoy = new Date();
-      const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
-
-      // Días del mes anterior para rellenar
-      const diasPrev = [];
-      const prevMonth = new Date(year, month-1, 0);
-      for(let i=startDow-1; i>=0; i--) diasPrev.push({d:prevMonth.getDate()-i, otro:true});
-
-      // Construir celdas
-      let celdas = [...diasPrev];
-      for(let d=1; d<=diasEnMes; d++) celdas.push({d, otro:false});
-      // Rellenar hasta completar semanas
-      while(celdas.length % 7 !== 0) celdas.push({d: celdas.length - diasPrev.length - diasEnMes + 1, otro:true});
-
+      const [year,month]=mes.split("-").map(Number);
+      const diasEnMes=new Date(year,month,0).getDate();
+      const primerDia=new Date(year,month-1,1);
+      let startDow=primerDia.getDay(); startDow=startDow===0?6:startDow-1;
+      const hoy=new Date();
+      const hoyStr=`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
+      const diasPrev=[];
+      const prevMonth=new Date(year,month-1,0);
+      for(let i=startDow-1;i>=0;i--) diasPrev.push({d:prevMonth.getDate()-i,otro:true});
+      let celdas=[...diasPrev];
+      for(let d=1;d<=diasEnMes;d++) celdas.push({d,otro:false});
+      while(celdas.length%7!==0) celdas.push({d:celdas.length-diasPrev.length-diasEnMes+1,otro:true});
       const diasSem=["LUN","MAR","MIÉ","JUE","VIE","SÁB","DOM"];
-
-      const html = `<div class="cal-grid">
+      document.getElementById("parrilla-content").innerHTML=`<div class="cal-grid">
         ${diasSem.map(d=>`<div class="cal-header-day">${d}</div>`).join("")}
         ${celdas.map(({d,otro})=>{
-          const dateStr = otro ? "" : `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-          const esHoy = dateStr === hoyStr;
-          const piezasDelDia = otro ? [] : piezas.filter(p=>p.fecha===dateStr);
+          const dateStr=otro?"":` ${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`.trim();
+          const esHoy=dateStr===hoyStr;
+          const pzsDia=otro?[]:piezas.filter(p=>p.fecha===dateStr);
           return `<div class="cal-cell ${otro?"otro-mes":""} ${esHoy?"hoy":""}">
             <div class="cal-day-num ${esHoy?"hoy-num":""}">${d}</div>
-            ${piezasDelDia.slice(0,3).map(p=>`
-              <div class="cal-pieza" onclick="window._abrirPieza('${p.id}')" title="${p.titulo||p.descripcion||""}">
-                ${p.mediaUrl
-                  ? p.mediaType==="video"
-                    ? `<video class="cal-pieza-thumb-video" src="${p.mediaUrl}" preload="none"></video>`
-                    : `<img class="cal-pieza-thumb" src="${p.mediaUrl}" loading="lazy" />`
-                  : `<div class="cal-pieza-empty">${p.tipo==="Reel"||p.tipo==="Story"?"🎬":"🖼️"}</div>`}
+            ${pzsDia.slice(0,3).map(p=>`
+              <div class="cal-pieza" title="${p.titulo||""}" onclick="window._abrirPieza('${p.id}')">
+                ${p.tipo==="Pendiente"
+                  ? `<div class="cal-pieza-empty" style="background:#f59e0b22;font-size:10px;color:var(--warning);padding:4px">📋 ${(p.titulo||"Pendiente").slice(0,12)}</div>`
+                  : p.mediaUrl
+                    ? p.mediaType==="video"
+                      ? `<video class="cal-pieza-thumb-video" src="${p.mediaUrl}" preload="none"></video>`
+                      : `<img class="cal-pieza-thumb" src="${p.mediaUrl}" loading="lazy" />`
+                    : `<div class="cal-pieza-empty">${p.tipo==="Reel"||p.tipo==="Story"?"🎬":"🖼️"}</div>`}
                 <div class="cal-pieza-label" style="background:${statusColor(p.status)}22;color:${statusColor(p.status)}">${p.titulo||p.tipo||"—"}</div>
               </div>`).join("")}
-            ${piezasDelDia.length>3?`<div style="font-size:9px;color:var(--text-muted);text-align:center">+${piezasDelDia.length-3} más</div>`:""}
-            ${!otro&&isAdmin()?`<div style="margin-top:2px;text-align:center">
-              <button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:2px" title="Agregar pieza" onclick="event.stopPropagation();window._addPiezaFecha('${dateStr}')">+</button>
-            </div>`:""}
+            ${pzsDia.length>3?`<div style="font-size:9px;color:var(--text-muted);text-align:center">+${pzsDia.length-3} más</div>`:""}
+            <div style="text-align:center;margin-top:2px">
+              <button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;line-height:1" title="Agregar pieza" onclick="event.stopPropagation();window._addPiezaFecha('${dateStr}')">+</button>
+            </div>
           </div>`;
         }).join("")}
       </div>`;
-
-      document.getElementById("parrilla-content").innerHTML = html;
     }
 
-    // ── RENDER LISTA (la original) ──
-    function renderLista(){
-      document.getElementById("parrilla-content").innerHTML = Object.keys(porFecha).length===0
-        ? `<div class="empty-state">${ico("calendar")}<h3>${isAdmin()?"Sin contenidos este mes":"Pendiente de publicar por la agencia"}</h3><p>${isAdmin()?"Agrega la primera pieza con el botón de arriba.":"Tu programación de contenidos aparecerá aquí cuando esté lista."}</p></div>`
-        : Object.entries(porFecha).map(([fecha,pzs])=>{
-            const fechaLabel = fecha!=="Sin fecha"
-              ? new Date(fecha+"T12:00:00").toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"})
-              : "Sin fecha asignada";
-            return `<div style="margin-bottom:32px">
-              <div style="font-family:var(--font-head);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:16px">${fechaLabel}</div>
-              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
-                ${pzs.map(p=>`
-                <div class="card" style="padding:0;overflow:hidden;cursor:pointer;transition:all var(--tr);border-color:${p.status==="aprobado"?"var(--success)":p.status==="rechazado"?"var(--error)":"var(--border)"}" onclick="window._abrirPieza('${p.id}')">
-                  <div style="position:relative">
-                    ${renderThumbnail(p)}
-                    <div style="position:absolute;top:8px;left:8px">${formatoBadge(p.tipo)}</div>
-                    <div style="position:absolute;top:8px;right:8px">${redIcon(p.red)}</div>
-                  </div>
-                  <div style="padding:12px">
-                    ${p.hora?`<div class="text-sm text-muted" style="margin-bottom:4px">${p.hora}</div>`:""}
-                    <div style="font-weight:700;font-size:13px;margin-bottom:4px;line-height:1.3">${p.titulo||p.descripcion||"Sin título"}</div>
-                    ${p.descripcion&&p.titulo?`<div class="text-sm text-muted truncate">${p.descripcion}</div>`:""}
-                    <div style="margin-top:8px;font-size:11px;font-weight:700;color:${statusColor(p.status)}">${statusLabel(p.status)}</div>
-                    ${p.comentarioCliente?`<div style="margin-top:6px;font-size:11px;color:var(--warning);background:var(--surface-el);border-radius:4px;padding:4px 8px">💬 ${p.comentarioCliente.slice(0,40)}${p.comentarioCliente.length>40?"…":""}</div>`:""}
-                  </div>
-                  ${isAdmin()?`<div style="padding:0 12px 12px;display:flex;gap:6px" onclick="event.stopPropagation()">
-                    <button class="btn-icon" style="flex:1;justify-content:center" onclick="window._editPieza('${p.id}')">${ico("edit")}</button>
-                    <button class="btn-icon" onclick="window._delPieza('${wsId}','${p.id}')">${ico("trash")}</button>
-                  </div>`:""}
-                </div>`).join("")}
-              </div>
-            </div>`;
-          }).join("");
-    }
-
-    // Render inicial: calendario
-    if(piezas.length===0 && !isAdmin()){
-      document.getElementById("parrilla-content").innerHTML=`<div class="empty-state">${ico("calendar")}<h3>Pendiente de publicar por la agencia</h3><p>Tu programación de contenidos aparecerá aquí cuando esté lista.</p></div>`;
+    // Render inicial
+    if(!isAdmin()){
+      renderLista();
     } else {
       renderCalendario();
+      document.getElementById("vista-tabs")?.querySelectorAll(".tab").forEach(t=>{
+        t.addEventListener("click",()=>{
+          document.querySelectorAll("#vista-tabs .tab").forEach(x=>x.classList.remove("active"));
+          t.classList.add("active");
+          if(t.dataset.vista==="calendario") renderCalendario();
+          else renderLista();
+        });
+      });
     }
 
-    // Tabs de vista
-    document.getElementById("vista-tabs")?.querySelectorAll(".tab").forEach(t=>{
-      t.addEventListener("click",()=>{
-        document.querySelectorAll("#vista-tabs .tab").forEach(x=>x.classList.remove("active"));
-        t.classList.add("active");
-        if(t.dataset.vista==="calendario") renderCalendario();
-        else renderLista();
-      });
-    });
-
-    // Agregar pieza desde calendario (clic en +)
-    window._addPiezaFecha=(fecha)=>{
-      openModalPieza(wsId, mes, ()=>cargarYRenderizar(mes), null, fecha);
-    };
-
-    document.getElementById("mes-selector")?.addEventListener("change",e=>{
-      mesActual=e.target.value;
-      mesLabel=meses.find(m=>m.val===mesActual)?.label||mesActual;
-      cargarYRenderizar(mesActual);
-    });
+    // Navegación de meses
+    document.getElementById("btn-mes-prev")?.addEventListener("click",()=>cargarYRenderizar(navMes(mes,-1)));
+    document.getElementById("btn-mes-next")?.addEventListener("click",()=>cargarYRenderizar(navMes(mes,1)));
 
     document.getElementById("btn-nueva-pieza")?.addEventListener("click",()=>{
-      openModalPieza(wsId, mesActual, ()=>cargarYRenderizar(mesActual));
+      openModalPieza(wsId,mes,()=>cargarYRenderizar(mes),null,null);
     });
 
-    window._abrirPieza=(pid)=>{
-      const p=window._piezasActuales.find(x=>x.id===pid);
-      if(p) openViewer(p);
-    };
-
-    window._editPieza=(pid)=>{
-      const p=window._piezasActuales.find(x=>x.id===pid);
-      if(p) openModalPieza(wsId, mesActual, ()=>cargarYRenderizar(mesActual), p);
-    };
-
+    window._abrirPieza=(pid)=>{ const p=window._piezasActuales.find(x=>x.id===pid); if(p) openViewer(p); };
+    window._editPieza=(pid)=>{ const p=window._piezasActuales.find(x=>x.id===pid); if(p) openModalPieza(wsId,mes,()=>cargarYRenderizar(mes),p,null); };
+    window._addPiezaFecha=(fecha)=>openModalPieza(wsId,mes,()=>cargarYRenderizar(mes),null,fecha);
     window._delPieza=async(wid,pid)=>{
       if(!confirm("¿Eliminar esta pieza?")) return;
       await deleteDoc(doc(db,"workspaces",wid,"contenidos",pid));
-      toast("Eliminada","success"); cargarYRenderizar(mesActual);
+      toast("Eliminada","success"); cargarYRenderizar(mes);
     };
   }
 
@@ -1699,6 +1910,10 @@ async function secContenidos(el){
 function openModalPieza(wsId, mes, cb, piezaEditar=null, fechaPreset=null){
   const isEdit=!!piezaEditar;
   const p=piezaEditar||{};
+  let mediaData = p.mediaUrl ? [{url:p.mediaUrl,type:p.mediaType,publicId:p.mediaPublicId}] : [];
+  // Para carrusel con múltiples imágenes
+  if(p.mediaUrls && p.mediaUrls.length) mediaData = p.mediaUrls;
+
   const ov=document.createElement("div"); ov.className="modal-overlay";
   ov.innerHTML=`<div class="modal modal-lg">
     <div class="modal-header">
@@ -1723,7 +1938,7 @@ function openModalPieza(wsId, mes, cb, piezaEditar=null, fechaPreset=null){
       <div class="form-row">
         <div class="form-group"><label class="form-label">Formato</label>
           <select class="form-select" id="mc-tipo">
-            ${["Reel","Imagen","Carrusel","Story"].map(t=>`<option ${p.tipo===t?"selected":""}>${t}</option>`).join("")}
+            ${["Reel","Imagen","Carrusel","Story","Pendiente"].map(t=>`<option ${p.tipo===t?"selected":""}>${t}</option>`).join("")}
           </select></div>
         <div class="form-group"><label class="form-label">Estado</label>
           <select class="form-select" id="mc-status">
@@ -1732,20 +1947,20 @@ function openModalPieza(wsId, mes, cb, piezaEditar=null, fechaPreset=null){
           </select></div>
       </div>
       <div class="form-group"><label class="form-label">Descripción / Tema</label>
-        <textarea class="form-textarea" id="mc-desc" placeholder="De qué trata esta pieza…" style="min-height:70px">${p.descripcion||""}</textarea></div>
+        <textarea class="form-textarea" id="mc-desc" style="min-height:70px">${p.descripcion||""}</textarea></div>
       <div class="form-group"><label class="form-label">Copy / Caption</label>
-        <textarea class="form-textarea" id="mc-copy" placeholder="Texto que acompañará la publicación…" style="min-height:80px">${p.copy||""}</textarea></div>
-      <div class="form-group">
-        <label class="form-label">Archivo (imagen o video)</label>
-        <div id="upload-zone" style="border:2px dashed var(--border);border-radius:var(--r);padding:24px;text-align:center;cursor:pointer;transition:border-color var(--tr)" onclick="document.getElementById('mc-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--primary)'" ondrop="event.preventDefault();this.style.borderColor='var(--border)';handleFileDrop(event.dataTransfer.files[0])">
-          <div id="upload-preview">
-            ${p.mediaUrl
-              ? p.mediaType==="video"
-                ? `<video src="${p.mediaUrl}" style="max-height:120px;border-radius:6px" controls></video><div class="text-sm text-muted mt-2">Archivo actual · clic para cambiar</div>`
-                : `<img src="${p.mediaUrl}" style="max-height:120px;border-radius:6px" /><div class="text-sm text-muted mt-2">Imagen actual · clic para cambiar</div>`
-              : `${ico("download")}<div class="text-sm text-muted mt-2">Arrastra aquí o clic para subir</div><div style="font-size:11px;color:var(--text-muted);margin-top:4px">MP4, MOV, JPG, PNG · máx 100MB</div>`}
+        <textarea class="form-textarea" id="mc-copy" style="min-height:80px">${p.copy||""}</textarea></div>
+      <div class="form-group" id="archivo-section">
+        <label class="form-label">Archivo(s) <span class="text-muted" id="archivo-hint">(imagen o video)</span></label>
+        <div id="upload-zone" style="border:2px dashed var(--border);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer" onclick="document.getElementById('mc-file').click()" ondragover="event.preventDefault()" ondrop="event.preventDefault();window._handleDrop(event.dataTransfer.files)">
+          <div id="upload-preview" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;min-height:60px;align-items:center">
+            ${mediaData.length>0
+              ? mediaData.map((m,i)=>m.type==="video"
+                  ? `<video src="${m.url}" style="height:80px;border-radius:6px" controls></video>`
+                  : `<img src="${m.url}" style="height:80px;border-radius:6px;object-fit:cover" />`).join("")
+              : `<div>${ico("download")}<div class="text-sm text-muted mt-2">Arrastra o clic para subir</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">MP4, MOV, JPG, PNG · máx 100MB</div></div>`}
           </div>
-          <input type="file" id="mc-file" accept="image/*,video/*" style="display:none" />
+          <input type="file" id="mc-file" accept="image/*,video/*" style="display:none" multiple />
         </div>
         <div id="upload-progress" style="display:none;margin-top:8px">
           <div style="background:var(--border);border-radius:4px;height:4px"><div id="upload-bar" style="background:var(--primary);height:100%;width:0%;border-radius:4px;transition:width .3s"></div></div>
@@ -1760,54 +1975,73 @@ function openModalPieza(wsId, mes, cb, piezaEditar=null, fechaPreset=null){
   </div>`;
   document.body.appendChild(ov);
 
-  let mediaData = p.mediaUrl ? {url:p.mediaUrl, type:p.mediaType, publicId:p.mediaPublicId} : null;
+  // Mostrar hint según formato
+  function updateHint(){
+    const tipo=document.getElementById("mc-tipo").value;
+    const hint=document.getElementById("archivo-hint");
+    const input=document.getElementById("mc-file");
+    if(tipo==="Carrusel"){ hint.textContent="(selecciona múltiples imágenes)"; input.multiple=true; }
+    else if(tipo==="Pendiente"){ hint.textContent="(opcional — solo idea/estrategia)"; input.multiple=false; }
+    else { hint.textContent="(imagen o video)"; input.multiple=false; }
+  }
+  document.getElementById("mc-tipo").addEventListener("change",updateHint);
+  updateHint();
 
   const close=()=>ov.remove();
   document.getElementById("mc-close").onclick=close;
   document.getElementById("mc-cancel").onclick=close;
   ov.addEventListener("click",e=>{ if(e.target===ov) close(); });
 
-  async function handleFile(file){
-    if(!file) return;
+  async function handleFiles(files){
+    const arr=Array.from(files);
+    if(!arr.length) return;
     const prog=document.getElementById("upload-progress");
     const bar=document.getElementById("upload-bar");
     const status=document.getElementById("upload-status");
     const preview=document.getElementById("upload-preview");
-    prog.style.display="block";
-    status.textContent="Subiendo archivo…";
-    bar.style.width="30%";
-    try{
-      const result = await uploadToCloudinary(file);
-      mediaData=result;
-      bar.style.width="100%";
-      status.textContent="✓ Subido correctamente";
-      if(result.type==="video"){
-        preview.innerHTML=`<video src="${result.url}" style="max-height:120px;border-radius:6px" controls></video><div class="text-sm text-success mt-2">Video listo</div>`;
-      } else {
-        preview.innerHTML=`<img src="${result.url}" style="max-height:120px;border-radius:6px" /><div class="text-sm text-success mt-2">Imagen lista</div>`;
-      }
-    }catch(e){ status.textContent="Error al subir. Intenta de nuevo."; bar.style.width="0%"; }
+    prog.style.display="block"; status.textContent=`Subiendo ${arr.length} archivo(s)…`;
+    const tipo=document.getElementById("mc-tipo").value;
+    // Si no es carrusel, solo tomar el primero
+    const toUpload = tipo==="Carrusel" ? arr : [arr[0]];
+    const results=[];
+    for(let i=0;i<toUpload.length;i++){
+      bar.style.width=`${Math.round(((i+0.5)/toUpload.length)*100)}%`;
+      status.textContent=`Subiendo ${i+1} de ${toUpload.length}…`;
+      try{
+        const r=await uploadToCloudinary(toUpload[i]);
+        results.push(r);
+      }catch(e){ status.textContent="Error: "+e.message; return; }
+    }
+    mediaData=results;
+    bar.style.width="100%"; status.textContent=`✓ ${results.length} archivo(s) listos`;
+    preview.innerHTML=results.map(r=>r.type==="video"
+      ? `<video src="${r.url}" style="height:80px;border-radius:6px" controls></video>`
+      : `<img src="${r.url}" style="height:80px;border-radius:6px;object-fit:cover" />`).join("");
   }
 
-  document.getElementById("mc-file").addEventListener("change",e=>handleFile(e.target.files[0]));
-  window.handleFileDrop=(file)=>handleFile(file);
+  document.getElementById("mc-file").addEventListener("change",e=>handleFiles(e.target.files));
+  window._handleDrop=(files)=>handleFiles(files);
 
   document.getElementById("mc-save").onclick=async()=>{
     const titulo=document.getElementById("mc-titulo").value.trim();
     if(!titulo){ toast("El título es requerido","error"); return; }
     const btn=document.getElementById("mc-save"); btn.disabled=true; btn.textContent="Guardando…";
+    const tipo=document.getElementById("mc-tipo").value;
+    // Para carrusel guardamos array; para otros, primer elemento
     const data={
-      mes, titulo,
+      mes, titulo, tipo,
       fecha: document.getElementById("mc-fecha").value||"",
       hora: document.getElementById("mc-hora").value||"",
       red: document.getElementById("mc-red").value,
-      tipo: document.getElementById("mc-tipo").value,
       status: document.getElementById("mc-status").value,
       descripcion: document.getElementById("mc-desc").value,
       copy: document.getElementById("mc-copy").value,
-      mediaUrl: mediaData?.url||"",
-      mediaType: mediaData?.type||"",
-      mediaPublicId: mediaData?.publicId||"",
+      // Un solo archivo (compatibilidad)
+      mediaUrl: mediaData[0]?.url||"",
+      mediaType: mediaData[0]?.type||"",
+      mediaPublicId: mediaData[0]?.publicId||"",
+      // Array para carrusel
+      mediaUrls: mediaData.length>1 ? mediaData : [],
       updatedAt: serverTimestamp(),
     };
     try{
@@ -1819,9 +2053,10 @@ function openModalPieza(wsId, mes, cb, piezaEditar=null, fechaPreset=null){
         toast("¡Pieza publicada!","success");
       }
       close(); cb&&cb();
-    }catch(e){ toast("Error al guardar: "+e.message,"error"); btn.disabled=false; btn.textContent=isEdit?"Actualizar":"Publicar pieza"; }
+    }catch(e){ toast("Error: "+e.message,"error"); btn.disabled=false; btn.textContent=isEdit?"Actualizar":"Publicar pieza"; }
   };
 }
+
 
 // ─────────────────────────────────────────
 // WORKSPACES
@@ -2107,7 +2342,30 @@ onAuthStateChanged(auth, async user=>{
   }catch(e){}
 
   hideLoading(); render();
+  // Cargar notificaciones de contenidos para admin
+  if(S.profile?.role==="admin") setTimeout(cargarNotifContenidos, 1500);
 });
+
+async function cargarNotifContenidos(){
+  try{
+    let total=0;
+    for(const ws of S.workspaces){
+      const snap=await getDocs(query(
+        collection(db,"workspaces",ws.id,"contenidos"),
+        where("comentarioCliente","!=","")
+      ));
+      total+=snap.docs.filter(d=>{
+        const data=d.data();
+        return data.comentarioCliente && !data.vistoPorAdmin;
+      }).length;
+    }
+    const badge=document.getElementById("notif-badge");
+    if(badge){
+      if(total>0){ badge.textContent=total; badge.style.display="inline-block"; }
+      else { badge.style.display="none"; }
+    }
+  }catch(e){}
+}
 </script>
 </body>
 </html>
