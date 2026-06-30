@@ -865,52 +865,7 @@ async function secPanelAgencia(el){
           </table></div>`}
       </div>
 
-    ${(()=>{
-      if(!ultimoROAS) return "";
-      const cls=roasClasificacion(parseFloat(ultimoROAS.roas||0));
-      return `<div class="card mt-4" id="dash-roas-card">
-        <div class="flex justify-between items-center mb-4">
-          <div class="section-title" style="margin-bottom:0;border:none;padding:0">📊 ROAS — ${ultimoROAS.nombre||"Último reporte"}</div>
-          <span class="text-sm text-muted">${ultimoROAS.periodo||fmtDate(ultimoROAS.creadoEn)}</span>
-        </div>
-        <div class="grid-2">
-          <div class="roas-display" style="border-color:${cls.color}">
-            <div class="roas-number" style="color:${cls.color}">${ultimoROAS.roas}x</div>
-            <div class="roas-label">Retorno en Ads</div>
-          </div>
-          <div>
-            <div class="stat-row"><span class="stat-key">Inversión</span><span class="stat-val">${fmtMXN(ultimoROAS.inversion||0)}</span></div>
-            <div class="stat-row"><span class="stat-key">Ingresos</span><span class="stat-val text-success">${fmtMXN(ultimoROAS.ingresos||0)}</span></div>
-            <div class="stat-row"><span class="stat-key">ROI</span><span class="stat-val" style="color:${cls.color}">${ultimoROAS.roi}%</span></div>
-            <div class="stat-row"><span class="stat-key">Clasificación</span><span class="stat-val" style="color:${cls.color}">${cls.emoji} ${cls.label}</span></div>
-          </div>
-        </div>
-      </div>`;
-    })()}
-    ${(()=>{
-      if(!ultimaMetrica) return "";
-      return `<div class="card mt-4" id="dash-metricas-card">
-        <div class="flex justify-between items-center mb-4">
-          <div class="section-title" style="margin-bottom:0;border:none;padding:0">📈 Métricas — ${ultimaMetrica.nombre||"Último reporte"}</div>
-          <span class="text-sm text-muted">${ultimaMetrica.periodo||fmtDate(ultimaMetrica.creadoEn)}</span>
-        </div>
-        <div class="grid-2">
-          <div>
-            ${ultimaMetrica.alcance?`<div class="stat-row"><span class="stat-key">👁 Alcance</span><span class="stat-val">${parseInt(ultimaMetrica.alcance).toLocaleString("es-MX")}</span></div>`:""}
-            ${ultimaMetrica.impresiones?`<div class="stat-row"><span class="stat-key">📢 Impresiones</span><span class="stat-val">${parseInt(ultimaMetrica.impresiones).toLocaleString("es-MX")}</span></div>`:""}
-            ${ultimaMetrica.interacciones?`<div class="stat-row"><span class="stat-key">❤️ Interacciones</span><span class="stat-val">${parseInt(ultimaMetrica.interacciones).toLocaleString("es-MX")}</span></div>`:""}
-            ${ultimaMetrica.clics?`<div class="stat-row"><span class="stat-key">👆 Clics</span><span class="stat-val">${parseInt(ultimaMetrica.clics).toLocaleString("es-MX")}</span></div>`:""}
-          </div>
-          <div>
-            ${ultimaMetrica.leads?`<div class="stat-row"><span class="stat-key">🎣 Leads</span><span class="stat-val">${parseInt(ultimaMetrica.leads).toLocaleString("es-MX")}</span></div>`:""}
-            ${ultimaMetrica.mensajes?`<div class="stat-row"><span class="stat-key">💬 Mensajes</span><span class="stat-val">${parseInt(ultimaMetrica.mensajes).toLocaleString("es-MX")}</span></div>`:""}
-            ${ultimaMetrica.seguidoresNuevos?`<div class="stat-row"><span class="stat-key">➕ Seguidores nuevos</span><span class="stat-val">${parseInt(ultimaMetrica.seguidoresNuevos).toLocaleString("es-MX")}</span></div>`:""}
-            ${ultimaMetrica.cpl?`<div class="stat-row"><span class="stat-key">💰 Costo por Lead</span><span class="stat-val">${fmtMXN(ultimaMetrica.cpl)}</span></div>`:""}
-          </div>
-        </div>
-        ${ultimaMetrica.observaciones?`<div style="margin-top:12px;background:var(--surface-el);border-radius:var(--r);padding:12px;border-left:3px solid var(--primary);font-size:13px">${ultimaMetrica.observaciones}</div>`:""}
-      </div>`;
-    })()}    </div>`;
+    </div>`;
   }
 
   el.innerHTML=`
@@ -1443,7 +1398,13 @@ async function secTodasVentas(el){
     <div class="form-group">
       <label class="form-label">Canal</label>
       <select class="form-select" id="f-canal">
-        ${CANAL_OPTIONS_ALL}
+        <option value="">Todos</option>
+        <option value="facebook">Facebook</option>
+        <option value="instagram">Instagram</option>
+        <option value="tiktok">TikTok</option>
+        <option value="google">Google</option>
+        <option value="referido">Referido</option>
+        <option value="otro">Otro</option>
       </select>
     </div>
     <div class="form-group">
