@@ -1597,8 +1597,7 @@ function exportCSV(ventas){
     const unixTs = Math.floor(fecha.getTime()/1000);
     return ["Purchase",unixTs,(v.monto||0).toFixed(2),"MXN",tel].join(",");
   });
-  const csv = ["event_name,event_time,value,currency,phone",...rows].join("
-");
+  const csv = ["event_name,event_time,value,currency,phone",...rows].join("\n");
   const a = document.createElement("a");
   a.href = "data:text/csv;charset=utf-8,"+encodeURIComponent(csv);
   a.download = "meta-offline-"+new Date().toISOString().slice(0,10)+".csv";
