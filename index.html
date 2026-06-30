@@ -558,7 +558,7 @@ function renderShell(){
           <div style="font-size:13px;font-weight:600" id="topbar-title">—</div>
           <div class="text-sm text-muted" id="topbar-sub" style="${isAdmin()&&S.currentWorkspace&&S.section!=='panel-agencia'?'':'display:none'}">${isAdmin()&&S.currentWorkspace?`Workspace: ${S.currentWorkspace.name}`:""}</div>
         </div>
-        <div id="topbar-actions" style="${S.section==='panel-agencia'?'display:none':''}">
+        <div id="topbar-actions" style="display:flex;align-items:center;gap:8px">
           ${wsLink}
           ${wsSwitcher}
         </div>
